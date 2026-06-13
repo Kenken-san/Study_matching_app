@@ -3,7 +3,11 @@ import cookieParser from "cookie-parser";
 import jwt from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { upsertUser, getUser, updateProfile, getAllUsers } from "./db.js";
+import {
+  upsertUser, getUser, updateProfile, getAllUsers,
+  sendConnect, acceptConnect, getConnectionStatus, getConnections, getPending,
+  addMessage, getMessages,
+} from "./db.js";
 
 const {
   GOOGLE_CLIENT_ID,
@@ -262,6 +266,50 @@ ${candidateList}
     console.error("Match error:", err.message);
     res.status(500).json({ error: "マッチング処理中にエラーが発生しました: " + err.message });
   }
+});
+
+// --- Connections -------------------------------------------------------------
+
+app.post("/api/connect/:targetId", requireSession, (req, res) => {
+  const { targetId } = req.params;
+  if (targetId === req.uid) return res.status(400).json({ error: "自分自身には申請できません" });
+  const conn = sendConnect(req.uid, targetId);
+  res.json({ conn });
+});
+
+app.put("/api/connect/:targetId/accept", requireSession, (req, res) => {
+  const conn = acceptConnect(req.uid, req.params.targetId);
+  if (!conn) return res.status(404).json({ error: "申請が見つかりません" });
+  res.json({ conn });
+});
+
+app.get("/api/connections", requireSession, (req, res) => {
+  res.json({ connections: getConnections(req.uid) });
+});
+
+app.get("/api/connections/pending", requireSession, (req, res) => {
+  res.json({ pending: getPending(req.uid) });
+});
+
+app.get("/api/connections/status/:targetId", requireSession, (req, res) => {
+  res.json({ status: getConnectionStatus(req.uid, req.params.targetId) });
+});
+
+// --- Messages ----------------------------------------------------------------
+
+app.post("/api/messages/:targetId", requireSession, (req, res) => {
+  const { text } = req.body;
+  if (!text?.trim()) return res.status(400).json({ error: "メッセージが空です" });
+  const status = getConnectionStatus(req.uid, req.params.targetId);
+  if (status !== "accepted") return res.status(403).json({ error: "繋がっていないユーザーにはメッセージできません" });
+  const msg = addMessage(req.uid, req.params.targetId, text.trim());
+  res.json({ msg });
+});
+
+app.get("/api/messages/:targetId", requireSession, (req, res) => {
+  const status = getConnectionStatus(req.uid, req.params.targetId);
+  if (status !== "accepted") return res.status(403).json({ error: "繋がっていません" });
+  res.json({ messages: getMessages(req.uid, req.params.targetId) });
 });
 
 app.listen(PORT, () => console.log(`http://localhost:${PORT}`));

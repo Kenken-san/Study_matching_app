@@ -312,3 +312,90 @@ export async function updateProfile(id, fields) {
 export function getAllUsers() {
   return [...users.values()];
 }
+
+// ---------- connections ------------------------------------------------------
+
+const connections = new Map(); // convKey -> { from, to, status }
+let nextConnId = 1;
+
+function convKey(a, b) {
+  return [a, b].sort().join("_");
+}
+
+function isDummy(id) {
+  return Number(id) >= 1 && Number(id) <= 12;
+}
+
+export function sendConnect(fromId, toId) {
+  const key = convKey(fromId, toId);
+  if (connections.has(key)) return connections.get(key);
+  const status = isDummy(toId) ? "accepted" : "pending";
+  const conn = { id: String(nextConnId++), from: fromId, to: toId, status, createdAt: Date.now() };
+  connections.set(key, conn);
+  return conn;
+}
+
+export function acceptConnect(fromId, toId) {
+  const key = convKey(fromId, toId);
+  const conn = connections.get(key);
+  if (!conn) return null;
+  if (conn.to !== fromId) return null; // only the recipient can accept
+  conn.status = "accepted";
+  return conn;
+}
+
+export function getConnectionStatus(uid, otherId) {
+  const conn = connections.get(convKey(uid, otherId));
+  if (!conn) return "none";
+  if (conn.status === "accepted") return "accepted";
+  if (conn.from === uid) return "pending_sent";
+  return "pending_received";
+}
+
+export function getConnections(uid) {
+  return [...connections.values()]
+    .filter((c) => c.status === "accepted" && (c.from === uid || c.to === uid))
+    .map((c) => {
+      const partnerId = c.from === uid ? c.to : c.from;
+      const partner = users.get(partnerId);
+      return {
+        connId: c.id,
+        partnerId,
+        nickname: partner?.profile?.nickname || partner?.name || "?",
+        affiliation: partner?.profile?.affiliation || "",
+        createdAt: c.createdAt,
+      };
+    });
+}
+
+export function getPending(uid) {
+  return [...connections.values()]
+    .filter((c) => c.status === "pending" && c.to === uid)
+    .map((c) => {
+      const sender = users.get(c.from);
+      return {
+        connId: c.id,
+        fromId: c.from,
+        nickname: sender?.profile?.nickname || sender?.name || "?",
+        affiliation: sender?.profile?.affiliation || "",
+        createdAt: c.createdAt,
+      };
+    });
+}
+
+// ---------- messages ---------------------------------------------------------
+
+const messages = new Map(); // convKey -> [{ id, fromId, text, createdAt }]
+let nextMsgId = 1;
+
+export function addMessage(fromId, toId, text) {
+  const key = convKey(fromId, toId);
+  if (!messages.has(key)) messages.set(key, []);
+  const msg = { id: String(nextMsgId++), fromId, text, createdAt: Date.now() };
+  messages.get(key).push(msg);
+  return msg;
+}
+
+export function getMessages(uid1, uid2) {
+  return messages.get(convKey(uid1, uid2)) || [];
+}
