@@ -26,18 +26,22 @@
 
   <script>
     async function onSignIn(response) {
-      // response.credential is the Google ID token (a JWT).
-      const r = await fetch("/api/auth/google", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ credential: response.credential }),
-      });
-      const data = await r.json();
-      const el = document.getElementById("status");
-      el.textContent = r.ok
-        ? `${data.isNew ? "Account created" : "Signed in"} as ${data.user.email}`
-        : `Error: ${data.error}`;
-    }
+  const r = await fetch("/api/auth/google", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ credential: response.credential }),
+  });
+  const data = await r.json();
+  if (r.ok) {
+    // Go to match if the profile's already complete, else onboarding.
+    location.href = data.user?.profile?.profileComplete
+      ? "/match.html"
+      : "/onboarding.html";
+  } else {
+    document.getElementById("status").textContent = `Error: ${data.error}`;
+  }
+}
+
   </script>
 </body>
 </html>
