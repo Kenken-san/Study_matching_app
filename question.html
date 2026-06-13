@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Study Matching App — プロフィール登録</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Plus Jakarta Sans', sans-serif; background: #eceef0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+
+.app {
+  display: flex;
+  width: 900px;
+  height: 640px;
+  background: #f2f4f6;
+  border-radius: 16px;
+  border: 0.5px solid #c6c6cd;
+  overflow: hidden;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.10);
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 200px;
+  min-width: 200px;
+  border-right: 0.5px solid #c6c6cd;
+  background: white;
+  padding: 1.5rem 0;
+  display: flex;
+  flex-direction: column;
+}
+.sidebar-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #191c1e;
+  padding: 0 1rem 1rem;
+  border-bottom: 0.5px solid #e0e3e5;
+  margin-bottom: 0.5rem;
+}
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0.6rem 1rem;
+  cursor: pointer;
+  transition: background 0.15s;
+  border-left: 2px solid transparent;
+}
+.step-item:hover { background: #f2f4f6; }
+.step-item.active { background: #f2f4f6; border-left-color: #4a6549; }
+.step-num {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 500;
+  background: #eceef0; color: #45464d;
+  flex-shrink: 0;
+}
+.step-item.active .step-num, .step-item.done .step-num {
+  background: #ccebc7; color: #334d33;
+}
+.step-label { font-size: 12px; color: #45464d; }
+.step-item.active .step-label { color: #191c1e; font-weight: 500; }
+
+/* ── Main Panel ── */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #f7f9fb;
+}
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 1.25rem; height: 52px;
+  background: white;
+  border-bottom: 0.5px solid #e0e3e5;
+  flex-shrink: 0;
+}
+.topbar-title { font-size: 15px; font-weight: 500; color: #000; }
+.topbar-close { font-size: 20px; color: #76777d; cursor: pointer; background: none; border: none; line-height: 1; }
+
+/* ── Progress ── */
+.progress-bar-wrap { padding: 1rem 1.5rem 0; flex-shrink: 0; }
+.progress-meta { display: flex; justify-content: space-between; font-size: 11px; color: #76777d; margin-bottom: 4px; }
+.progress-track { width: 100%; height: 4px; background: #e0e3e5; border-radius: 4px; overflow: hidden; }
+.progress-fill { height: 100%; background: #4a6549; border-radius: 4px; transition: width 0.5s ease; }
+
+/* ── Screen Area ── */
+.screen-area { flex: 1; overflow-y: auto; padding: 1.25rem 1.5rem; }
+.screen { display: none; }
+.screen.active { display: block; }
+.screen h2 { font-size: 18px; font-weight: 600; color: #191c1e; margin-bottom: 0.35rem; }
+.screen .sub { font-size: 13px; color: #45464d; margin-bottom: 1.25rem; line-height: 1.6; }
+
+/* ── Form Elements ── */
+.field-label { font-size: 12px; font-weight: 500; color: #45464d; margin-bottom: 0.4rem; letter-spacing: 0.03em; }
+input[type="text"], input[type="date"] {
+  width: 100%; height: 44px; padding: 0 12px;
+  border: 0.5px solid #c6c6cd; border-radius: 8px;
+  font-size: 15px; font-family: inherit;
+  background: white; color: #191c1e;
+  outline: none; transition: border-color 0.15s;
+}
+input[type="text"]:focus, input[type="date"]:focus {
+  border-color: #4a6549;
+  box-shadow: 0 0 0 2px rgba(74,101,73,0.1);
+}
+
+/* ── Radio Cards ── */
+.radio-card {
+  display: flex; align-items: center; gap: 12px;
+  padding: 0.75rem 1rem;
+  background: white;
+  border: 0.5px solid #c6c6cd; border-radius: 8px;
+  cursor: pointer; margin-bottom: 0.5rem;
+  transition: border-color 0.15s, background 0.15s;
+  user-select: none;
+}
+.radio-card:hover { border-color: #4a6549; background: #f2f4f6; }
+.radio-card.selected { border-color: #4a6549; background: #ccebc7; }
+.radio-card input { display: none; }
+.radio-icon {
+  width: 32px; height: 32px; border-radius: 6px;
+  background: #eceef0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; flex-shrink: 0;
+}
+.radio-card.selected .radio-icon { background: #4a6549; color: white; }
+.radio-text { font-size: 13px; font-weight: 500; color: #191c1e; }
+.radio-check { margin-left: auto; font-size: 16px; opacity: 0; color: #4a6549; }
+.radio-card.selected .radio-check { opacity: 1; }
+
+/* ── Chips ── */
+.chip-wrap { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 1rem; }
+.chip {
+  padding: 5px 12px;
+  border: 0.5px solid #c6c6cd; border-radius: 999px;
+  font-size: 12px; cursor: pointer;
+  background: white; color: #45464d;
+  transition: all 0.15s; user-select: none;
+}
+.chip:hover { border-color: #4a6549; background: #f2f4f6; }
+.chip.on { background: #ccebc7; border-color: #4a6549; color: #334d33; }
+
+.cat-label {
+  font-size: 11px; font-weight: 500; color: #76777d;
+  letter-spacing: 0.05em; text-transform: uppercase;
+  margin: 1rem 0 0.5rem;
+}
+
+/* ── Tag Input ── */
+.tag-input-wrap { display: flex; gap: 8px; margin-bottom: 1rem; }
+.tag-input-wrap input { flex: 1; }
+.tag-add-btn {
+  padding: 0 14px; height: 44px;
+  background: #191c1e; color: white;
+  border-radius: 8px; font-size: 13px; font-weight: 500;
+  cursor: pointer; border: none; white-space: nowrap;
+  font-family: inherit;
+}
+.tag-add-btn:hover { opacity: 0.85; }
+
+/* ── Active Tags ── */
+.active-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 1rem; min-height: 28px; }
+.active-tag {
+  display: flex; align-items: center; gap: 4px;
+  padding: 4px 10px;
+  background: #ccebc7; border-radius: 999px;
+  font-size: 12px; color: #334d33;
+}
+.active-tag .remove { cursor: pointer; font-size: 14px; line-height: 1; }
+
+/* ── Info Card ── */
+.info-card {
+  background: #f2f4f6; border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 12px; color: #45464d;
+  display: flex; gap: 8px; align-items: flex-start;
+  margin-top: 1rem;
+}
+.info-icon { font-size: 16px; color: #4a6549; flex-shrink: 0; }
+
+/* ── Region Grid ── */
+.region-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.region-card {
+  padding: 1rem; background: white;
+  border: 0.5px solid #c6c6cd; border-radius: 8px;
+  cursor: pointer; transition: all 0.15s;
+  user-select: none;
+}
+.region-card:hover { border-color: #4a6549; }
+.region-card.selected { border-color: #4a6549; border-width: 1.5px; background: #ccebc7; }
+.region-card.full { grid-column: 1 / -1; }
+.region-flag { font-size: 24px; margin-bottom: 8px; }
+.region-name { font-size: 13px; font-weight: 500; color: #191c1e; }
+.region-sub { font-size: 11px; color: #76777d; }
+
+/* ── Footer ── */
+.footer {
+  padding: 1rem 1.5rem;
+  background: white;
+  border-top: 0.5px solid #e0e3e5;
+  display: flex; gap: 10px; align-items: center;
+  flex-shrink: 0;
+}
+.btn-next {
+  flex: 1; height: 40px;
+  background: #191c1e; color: white;
+  border-radius: 999px; font-size: 13px; font-weight: 500;
+  cursor: pointer; border: none;
+  transition: opacity 0.15s; font-family: inherit;
+}
+.btn-next:hover { opacity: 0.85; }
+.btn-back {
+  height: 40px; padding: 0 16px;
+  background: transparent; color: #45464d;
+  border: 0.5px solid #c6c6cd; border-radius: 999px;
+  font-size: 13px; cursor: pointer; font-family: inherit;
+}
+.btn-back:hover { background: #f2f4f6; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-title">Study Matching App 登録</div>
+    <div class="step-item active" data-step="1" onclick="goStep(1)">
+      <div class="step-num">1</div><span class="step-label">ニックネーム</span>
+    </div>
+    <div class="step-item" data-step="2" onclick="goStep(2)">
+      <div class="step-num">2</div><span class="step-label">性別</span>
+    </div>
+    <div class="step-item" data-step="3" onclick="goStep(3)">
+      <div class="step-num">3</div><span class="step-label">年齢</span>
+    </div>
+    <div class="step-item" data-step="4" onclick="goStep(4)">
+      <div class="step-num">4</div><span class="step-label">所属</span>
+    </div>
+    <div class="step-item" data-step="5" onclick="goStep(5)">
+      <div class="step-num">5</div><span class="step-label">ジャンル</span>
+    </div>
+    <div class="step-item" data-step="6" onclick="goStep(6)">
+      <div class="step-num">6</div><span class="step-label">レベルタグ</span>
+    </div>
+    <div class="step-item" data-step="7" onclick="goStep(7)">
+      <div class="step-num">7</div><span class="step-label">目標タグ</span>
+    </div>
+    <div class="step-item" data-step="8" onclick="goStep(8)">
+      <div class="step-num">8</div><span class="step-label">地域</span>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <span class="topbar-title" id="topbar-title">ステップ 1 / 8 — ニックネーム</span>
+      <button class="topbar-close" aria-label="閉じる">✕</button>
+    </div>
+
+    <div class="progress-bar-wrap">
+      <div class="progress-meta">
+        <span id="prog-label">1 / 8</span>
+        <span id="prog-pct">12%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="prog-fill" style="width:12.5%"></div>
+      </div>
+    </div>
+
+    <div class="screen-area">
+
+      <!-- Step 1: ニックネーム -->
+      <div class="screen active" id="s1">
+        <h2>まずはニックネームを教えてください</h2>
+        <p class="sub">アプリ内で表示される名前です。本名でなくてもかまいません。</p>
+        <div class="field-label">ニックネーム</div>
+        <input type="text" id="nickname-input" placeholder="例：あきら">
+        <div class="info-card">
+          <span class="info-icon">🛡️</span>
+          <span>ニックネームはいつでも変更できます。</span>
+        </div>
+      </div>
+
+      <!-- Step 2: 性別 -->
+      <div class="screen" id="s2">
+        <h2>性別を選択してください</h2>
+        <p class="sub">マッチングの安心安全のため、正確な情報をご選択ください（公開・非公開を設定できます）</p>
+        <div class="radio-card" onclick="selectRadio(this,'gender')">
+          <input type="radio" name="gender" value="男性">
+          <div class="radio-icon">♂</div>
+          <span class="radio-text">男性</span>
+          <span class="radio-check">✓</span>
+        </div>
+        <div class="radio-card" onclick="selectRadio(this,'gender')">
+          <input type="radio" name="gender" value="女性">
+          <div class="radio-icon">♀</div>
+          <span class="radio-text">女性</span>
+          <span class="radio-check">✓</span>
+        </div>
+        <div class="radio-card" onclick="selectRadio(this,'gender')">
+          <input type="radio" name="gender" value="その他">
+          <div class="radio-icon">⚥</div>
+          <span class="radio-text">その他・回答しない</span>
+          <span class="radio-check">✓</span>
+        </div>
+      </div>
+
+      <!-- Step 3: 年齢 -->
+      <div class="screen" id="s3">
+        <h2>年齢を教えてください</h2>
+        <p class="sub">生年月日を入力してください（アプリ内では「〇代」または「〇歳」と表示されます）</p>
+        <div class="field-label">生年月日</div>
+        <input type="date" id="birth-input">
+        <div class="info-card">
+          <span class="info-icon">🛡️</span>
+          <span>正確な年齢を入力することで、より最適なスタディバディを見つけることができます。</span>
+        </div>
+      </div>
+
+      <!-- Step 4: 所属 -->
+      <div class="screen" id="s4">
+        <h2>現在の所属を選択してください</h2>
+        <p class="sub">あなたに最適なスタディグループや講師を提案するために使用します。</p>
+        <div class="radio-card" onclick="selectRadio(this,'occ')"><input type="radio" name="occ" value="中学生"><div class="radio-icon">🏫</div><span class="radio-text">中学生</span><span class="radio-check">✓</span></div>
+        <div class="radio-card" onclick="selectRadio(this,'occ')"><input type="radio" name="occ" value="高校生"><div class="radio-icon">📚</div><span class="radio-text">高校生</span><span class="radio-check">✓</span></div>
+        <div class="radio-card" onclick="selectRadio(this,'occ')"><input type="radio" name="occ" value="大学生・大学院生"><div class="radio-icon">🎓</div><span class="radio-text">大学生・大学院生</span><span class="radio-check">✓</span></div>
+        <div class="radio-card" onclick="selectRadio(this,'occ')"><input type="radio" name="occ" value="専門学校生"><div class="radio-icon">⚙️</div><span class="radio-text">専門学校生</span><span class="radio-check">✓</span></div>
+        <div class="radio-card" onclick="selectRadio(this,'occ')"><input type="radio" name="occ" value="浪人生"><div class="radio-icon">⏳</div><span class="radio-text">浪人生・資格浪人</span><span class="radio-check">✓</span></div>
+        <div class="radio-card" onclick="selectRadio(this,'occ')"><input type="radio" name="occ" value="社会人（会社員）"><div class="radio-icon">🏢</div><span class="radio-text">社会人（会社員）</span><span class="radio-check">✓</span></div>
+        <div class="radio-card" onclick="selectRadio(this,'occ')"><input type="radio" name="occ" value="フリーランス"><div class="radio-icon">💼</div><span class="radio-text">フリーランス・経営者</span><span class="radio-check">✓</span></div>
+        <div class="radio-card" onclick="selectRadio(this,'occ')"><input type="radio" name="occ" value="その他"><div class="radio-icon">•••</div><span class="radio-text">その他</span><span class="radio-check">✓</span></div>
+      </div>
+
+      <!-- Step 5: ジャンル -->
+      <div class="screen" id="s5">
+        <h2>勉強中のジャンルを選択</h2>
+        <p class="sub">いま最も力を入れている、またはこれから学びたい分野を選んでください。複数選択可。</p>
+        <div class="tag-input-wrap">
+          <input type="text" id="s5-custom" placeholder="新しいタグを入力...">
+          <button class="tag-add-btn" onclick="addCustomTag('s5')">+ 追加</button>
+        </div>
+        <div class="active-tags" id="s5-tags"></div>
+        <div class="cat-label">語学</div>
+        <div class="chip-wrap">
+          <div class="chip" onclick="toggleChip(this,'s5')">TOEIC</div>
+          <div class="chip" onclick="toggleChip(this,'s5')">TOEFL</div>
+          <div class="chip" onclick="toggleChip(this,'s5')">英会話</div>
+          <div class="chip" onclick="toggleChip(this,'s5')">中国語</div>
+          <div class="chip" onclick="toggleChip(this,'s5')">韓国語</div>
+        </div>
+        <div class="cat-label">資格・検定</div>
+        <div class="chip-wrap">
+          <div class="chip" onclick="toggleChip(this,'s5')">公認会計士</div>
+          <div class="chip" onclick="toggleChip(this,'s5')">宅建</div>
+          <div class="chip" onclick="toggleChip(this,'s5')">簿記</div>
+          <div class="chip" onclick="toggleChip(this,'s5')">行政書士</div>
+        </div>
+        <div class="cat-label">IT・クリエイティブ</div>
+        <div class="chip-wrap">
+          <div class="chip" onclick="toggleChip(this,'s5')">プログラミング</div>
+          <div class="chip" onclick="toggleChip(this,'s5')">UI/UXデザイン</div>
+          <div class="chip" onclick="toggleChip(this,'s5')">データサイエンス</div>
+          <div class="chip" onclick="toggleChip(this,'s5')">動画編集</div>
+        </div>
+        <div class="cat-label">受験・学問</div>
+        <div class="chip-wrap">
+          <div class="chip" onclick="toggleChip(this,'s5')">大学受験</div>
+          <div class="chip" onclick="toggleChip(this,'s5')">公務員試験</div>
+          <div class="chip" onclick="toggleChip(this,'s5')">MBA</div>
+          <div class="chip" onclick="toggleChip(this,'s5')">医学</div>
+        </div>
+        <div class="cat-label">コミュニティ</div>
+        <div class="chip-wrap">
+          <div class="chip" onclick="toggleChip(this,'s5')">#朝活</div>
+          <div class="chip" onclick="toggleChip(this,'s5')">#集中モード</div>
+          <div class="chip" onclick="toggleChip(this,'s5')">#独学</div>
+        </div>
+      </div>
+
+      <!-- Step 6: レベルタグ -->
+      <div class="screen" id="s6">
+        <h2>現在のレベルをタグで表現</h2>
+        <p class="sub">コミュニティで共有されているタグから選ぶか、新しく作成できます。</p>
+        <div class="tag-input-wrap">
+          <input type="text" id="s6-custom" placeholder="例：#TOEIC700">
+          <button class="tag-add-btn" onclick="addCustomTag('s6')">+ 追加</button>
+        </div>
+        <div class="active-tags" id="s6-tags"></div>
+        <div class="cat-label">人気のタグ</div>
+        <div class="chip-wrap">
+          <div class="chip" onclick="toggleChip(this,'s6')">#Beginner</div>
+          <div class="chip" onclick="toggleChip(this,'s6')">#TOEIC700</div>
+          <div class="chip" onclick="toggleChip(this,'s6')">#N3</div>
+          <div class="chip" onclick="toggleChip(this,'s6')">#実務レベル</div>
+          <div class="chip" onclick="toggleChip(this,'s6')">#独学中</div>
+          <div class="chip" onclick="toggleChip(this,'s6')">#初学者</div>
+          <div class="chip" onclick="toggleChip(this,'s6')">#中級者</div>
+          <div class="chip" onclick="toggleChip(this,'s6')">#上級者</div>
+        </div>
+      </div>
+
+      <!-- Step 7: 目標タグ -->
+      <div class="screen" id="s7">
+        <h2>目標をタグで設定しましょう</h2>
+        <p class="sub">あなたの目標に近いタグを選んだり、新しく作成したりできます。同じタグの仲間と繋がれます。</p>
+        <div class="tag-input-wrap">
+          <input type="text" id="s7-custom" placeholder="例：#TOEIC800">
+          <button class="tag-add-btn" onclick="addCustomTag('s7')">+ 追加</button>
+        </div>
+        <div class="active-tags" id="s7-tags"></div>
+        <div class="cat-label">人気の目標タグ</div>
+        <div class="chip-wrap">
+          <div class="chip" onclick="toggleChip(this,'s7')">#毎日勉強</div>
+          <div class="chip" onclick="toggleChip(this,'s7')">#キャリアチェンジ</div>
+          <div class="chip" onclick="toggleChip(this,'s7')">#資格試験合格</div>
+          <div class="chip" onclick="toggleChip(this,'s7')">#朝活</div>
+          <div class="chip" onclick="toggleChip(this,'s7')">#TOEIC900</div>
+          <div class="chip" onclick="toggleChip(this,'s7')">#英語ペラペラ</div>
+          <div class="chip" onclick="toggleChip(this,'s7')">#半年で転職</div>
+        </div>
+      </div>
+
+      <!-- Step 8: 地域 -->
+      <div class="screen" id="s8">
+        <h2>居住国・お住まいの地域</h2>
+        <p class="sub">主に活動している国や地域を選択してください。</p>
+        <div class="region-grid">
+          <div class="region-card full selected" onclick="selectRegion(this)">
+            <div class="region-flag">🇯🇵</div>
+            <div class="region-name">日本</div>
+            <div class="region-sub">Japan</div>
+          </div>
+          <div class="region-card" onclick="selectRegion(this)">
+            <div class="region-flag">🇺🇸</div>
+            <div class="region-name">アメリカ</div>
+          </div>
+          <div class="region-card" onclick="selectRegion(this)">
+            <div class="region-flag">🇰🇷</div>
+            <div class="region-name">韓国</div>
+          </div>
+          <div class="region-card" onclick="selectRegion(this)">
+            <div class="region-flag">🇨🇳</div>
+            <div class="region-name">中国</div>
+          </div>
+          <div class="region-card" onclick="selectRegion(this)">
+            <div class="region-flag">🇬🇧</div>
+            <div class="region-name">イギリス</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /screen-area -->
+
+    <div class="footer">
+      <button class="btn-back" id="btn-back" onclick="prevStep()" style="display:none">← 戻る</button>
+      <button class="btn-next" id="btn-next" onclick="nextStep()">次へ →</button>
+    </div>
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<script>
+const titles = ['ニックネーム','性別','年齢','所属','ジャンル','レベルタグ','目標タグ','地域'];
+let cur = 1;
+const chipState = { s5: new Set(), s6: new Set(), s7: new Set() };
+
+function goStep(n) {
+  // スクリーン切り替え
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('s' + n).classList.add('active');
+
+  // サイドバーのアクティブ・完了状態
+  document.querySelectorAll('.step-item').forEach((el, i) => {
+    el.classList.remove('active', 'done');
+    if (i + 1 < n) el.classList.add('done');
+  });
+  document.querySelector('[data-step="' + n + '"]').classList.add('active');
+
+  // プログレスバー更新
+  const pct = Math.round((n / 8) * 100);
+  document.getElementById('prog-fill').style.width = pct + '%';
+  document.getElementById('prog-label').textContent = n + ' / 8';
+  document.getElementById('prog-pct').textContent = pct + '%';
+
+  // トップバータイトル
+  document.getElementById('topbar-title').textContent =
+    'ステップ ' + n + ' / 8 — ' + titles[n - 1];
+
+  // 戻るボタン表示制御
+  document.getElementById('btn-back').style.display = n > 1 ? 'block' : 'none';
+
+  // 次へボタンラベル
+  document.getElementById('btn-next').textContent =
+    n === 8 ? '登録を完了する ✓' : '次へ →';
+
+  cur = n;
+}
+
+function nextStep() {
+  if (cur < 8) {
+    goStep(cur + 1);
+  } else {
+    alert('登録が完了しました！ Study Matching App へようこそ🎉');
+  }
+}
+
+function prevStep() {
+  if (cur > 1) goStep(cur - 1);
+}
+
+// ラジオカード選択
+function selectRadio(el, name) {
+  el.closest('.screen').querySelectorAll('.radio-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+// チップのトグル
+function toggleChip(el, group) {
+  const label = el.textContent.trim();
+  el.classList.toggle('on');
+  const tagsEl = document.getElementById(group + '-tags');
+
+  if (el.classList.contains('on')) {
+    chipState[group].add(label);
+    const tag = document.createElement('div');
+    tag.className = 'active-tag';
+    tag.dataset.key = label;
+    tag.innerHTML = label + '<span class="remove" onclick="removeTag(this,\'' + group + '\',\'' + label.replace(/'/g, "\\'") + '\')">×</span>';
+    tagsEl.appendChild(tag);
+  } else {
+    chipState[group].delete(label);
+    tagsEl.querySelectorAll('.active-tag').forEach(t => {
+      if (t.dataset.key === label) t.remove();
+    });
+  }
+}
+
+// カスタムタグ追加
+function addCustomTag(group) {
+  const input = document.getElementById(group + '-custom');
+  const val = input.value.trim();
+  if (!val) return;
+  chipState[group].add(val);
+  const tagsEl = document.getElementById(group + '-tags');
+  const tag = document.createElement('div');
+  tag.className = 'active-tag';
+  tag.dataset.key = val;
+  tag.innerHTML = val + '<span class="remove" onclick="removeTag(this,\'' + group + '\',\'' + val.replace(/'/g, "\\'") + '\')">×</span>';
+  tagsEl.appendChild(tag);
+  input.value = '';
+}
+
+// タグ削除
+function removeTag(el, group, key) {
+  chipState[group].delete(key);
+  el.closest('.active-tag').remove();
+  // 対応チップのon状態も解除
+  const screenEl = document.getElementById('s' + group[1]);
+  screenEl.querySelectorAll('.chip').forEach(c => {
+    if (c.textContent.trim() === key) c.classList.remove('on');
+  });
+}
+
+// 地域カード選択
+function selectRegion(el) {
+  el.closest('.region-grid').querySelectorAll('.region-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+}
+</script>
+
+</body>
+</html>
