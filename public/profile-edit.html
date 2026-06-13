@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>StudyMatch — プロフィール編集</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+    .card {
+      background: white;
+      border-radius: 24px;
+      padding: 2.5rem 2rem;
+      max-width: 540px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    }
+    .page-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 2rem;
+    }
+    .back-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 1.25rem;
+      color: #667eea;
+      padding: 0;
+      line-height: 1;
+    }
+    h1 { font-size: 1.4rem; color: #1a1a2e; }
+
+    .field { margin-bottom: 1.5rem; }
+    label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #555;
+      margin-bottom: 0.4rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    input[type="text"], textarea {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: 2px solid #e2e8f0;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-family: inherit;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+    input:focus, textarea:focus { border-color: #667eea; }
+    textarea { min-height: 130px; resize: vertical; }
+
+    .radio-group { display: flex; flex-direction: column; gap: 6px; }
+    .radio-option {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.65rem 1rem;
+      border: 2px solid #e2e8f0;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 0.9rem;
+      color: #333;
+    }
+    .radio-option:hover { border-color: #667eea; }
+    .radio-option.selected { border-color: #667eea; background: #f0f0ff; color: #667eea; font-weight: 600; }
+    .radio-dot {
+      width: 16px; height: 16px;
+      border: 2px solid #ccc;
+      border-radius: 50%;
+      flex-shrink: 0;
+      transition: all 0.2s;
+    }
+    .radio-option.selected .radio-dot { border-color: #667eea; background: #667eea; }
+
+    .options-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 7px;
+    }
+    .option-chip {
+      padding: 0.45rem 0.7rem;
+      border: 2px solid #e2e8f0;
+      border-radius: 20px;
+      text-align: center;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      user-select: none;
+      color: #555;
+    }
+    .option-chip:hover { border-color: #667eea; color: #667eea; }
+    .option-chip.selected { background: #667eea; border-color: #667eea; color: white; }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 2rem;
+    }
+    button.btn {
+      flex: 1;
+      padding: 0.85rem;
+      border: none;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-cancel { background: #f0f0f0; color: #666; }
+    .btn-cancel:hover { background: #e0e0e0; }
+    .btn-save {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      box-shadow: 0 4px 15px rgba(102,126,234,0.4);
+    }
+    .btn-save:hover { transform: translateY(-1px); }
+    .btn-save:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    #error-msg { color: #e53e3e; font-size: 0.875rem; margin-top: 0.75rem; min-height: 1.25rem; }
+
+    .loading-overlay {
+      text-align: center;
+      padding: 3rem 0;
+      color: #888;
+    }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid #e2e8f0;
+      border-top-color: #667eea;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 1rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="page-header">
+      <button class="back-btn" onclick="location.href='/match.html'">←</button>
+      <h1>プロフィール編集</h1>
+    </div>
+
+    <div id="form-area">
+      <div class="loading-overlay">
+        <div class="spinner"></div>
+        <p>プロフィールを読み込み中...</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const AFFILIATIONS = [
+      "高校生", "浪人生", "大学生・大学院生", "専門学校生",
+      "社会人（会社員）", "社会人（フリーランス・経営者）", "その他",
+    ];
+
+    const STUDY_FIELDS = [
+      "大学受験", "大学院受験", "高校受験",
+      "TOEIC", "TOEFL", "英会話", "英語",
+      "韓国語", "中国語", "フランス語",
+      "公認会計士", "税理士", "行政書士", "宅建", "簿記",
+      "プログラミング", "Python", "JavaScript", "React",
+      "データ分析", "機械学習", "AI",
+      "Webデザイン", "動画編集", "UI/UX",
+      "数学", "物理", "化学", "生物",
+      "国語", "日本史", "世界史", "地理",
+      "医学・看護", "法律", "経済学",
+      "読書・教養", "ビジネス",
+    ];
+
+    let selectedAffiliation = "";
+    let selectedFields = [];
+
+    function buildForm(profile) {
+      selectedAffiliation = profile.affiliation || "";
+      selectedFields = [...(profile.studyFields || [])];
+
+      const affiliationHtml = AFFILIATIONS.map((a) => `
+        <div class="radio-option${a === selectedAffiliation ? " selected" : ""}"
+             onclick="selectAffiliation('${a}', this)">
+          <div class="radio-dot"></div><span>${a}</span>
+        </div>`).join("");
+
+      const fieldsHtml = STUDY_FIELDS.map((f) => `
+        <div class="option-chip${selectedFields.includes(f) ? " selected" : ""}"
+             onclick="toggleField('${f}', this)">${f}</div>`).join("");
+
+      document.getElementById("form-area").innerHTML = `
+        <div class="field">
+          <label>ニックネーム</label>
+          <input type="text" id="nickname" value="${esc(profile.nickname || "")}" maxlength="20" placeholder="例：たろう" />
+        </div>
+
+        <div class="field">
+          <label>現在の所属</label>
+          <div class="radio-group" id="affiliation-group">${affiliationHtml}</div>
+        </div>
+
+        <div class="field">
+          <label>勉強中の分野（複数選択可）</label>
+          <div class="options-grid" id="fields-grid">${fieldsHtml}</div>
+        </div>
+
+        <div class="field">
+          <label>最終目標</label>
+          <input type="text" id="goal" value="${esc(profile.goal || "")}" maxlength="100"
+            placeholder="例：今年12月までにTOEIC 800点突破" />
+        </div>
+
+        <div class="field">
+          <label>自己紹介・今の状況</label>
+          <textarea id="bio" placeholder="勉強を始めた理由、今の悩み、どんな仲間が欲しいかを自由に…">${esc(profile.bio || "")}</textarea>
+        </div>
+
+        <div id="error-msg"></div>
+
+        <div class="actions">
+          <button class="btn btn-cancel" onclick="location.href='/match.html'">キャンセル</button>
+          <button class="btn btn-save" id="btn-save" onclick="saveProfile()">保存してマッチ更新 ✨</button>
+        </div>
+      `;
+    }
+
+    function esc(str) {
+      return String(str ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function selectAffiliation(value, el) {
+      selectedAffiliation = value;
+      document.querySelectorAll("#affiliation-group .radio-option").forEach((o) =>
+        o.classList.remove("selected")
+      );
+      el.classList.add("selected");
+    }
+
+    function toggleField(value, el) {
+      el.classList.toggle("selected");
+      if (el.classList.contains("selected")) {
+        selectedFields.push(value);
+      } else {
+        selectedFields = selectedFields.filter((f) => f !== value);
+      }
+    }
+
+    async function saveProfile() {
+      const nickname = document.getElementById("nickname").value.trim();
+      const goal = document.getElementById("goal").value.trim();
+      const bio = document.getElementById("bio").value.trim();
+      const errEl = document.getElementById("error-msg");
+
+      if (!nickname) { errEl.textContent = "ニックネームを入力してください"; return; }
+      if (!selectedAffiliation) { errEl.textContent = "所属を選択してください"; return; }
+      if (selectedFields.length === 0) { errEl.textContent = "分野を1つ以上選択してください"; return; }
+      if (!goal) { errEl.textContent = "目標を入力してください"; return; }
+      if (bio.length < 20) { errEl.textContent = "自己紹介をもう少し詳しく書いてください（20文字以上）"; return; }
+      errEl.textContent = "";
+
+      const btn = document.getElementById("btn-save");
+      btn.disabled = true;
+      btn.textContent = "保存中...";
+
+      try {
+        const r = await fetch("/api/profile", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nickname,
+            affiliation: selectedAffiliation,
+            studyFields: selectedFields,
+            goal,
+            bio,
+          }),
+        });
+        if (!r.ok) {
+          const d = await r.json();
+          throw new Error(d.error || "保存に失敗しました");
+        }
+        location.href = "/match.html";
+      } catch (err) {
+        document.getElementById("error-msg").textContent = err.message;
+        btn.disabled = false;
+        btn.textContent = "保存してマッチ更新 ✨";
+      }
+    }
+
+    // Load profile on mount
+    (async () => {
+      try {
+        const meRes = await fetch("/api/me");
+        if (!meRes.ok) { location.href = "/"; return; }
+
+        const profRes = await fetch("/api/profile");
+        if (!profRes.ok) throw new Error("プロフィール取得失敗");
+        const { profile } = await profRes.json();
+        buildForm(profile || {});
+      } catch (err) {
+        document.getElementById("form-area").innerHTML =
+          `<p style="color:#e53e3e">読み込みに失敗しました: ${err.message}</p>`;
+      }
+    })();
+  </script>
+</body>
+</html>

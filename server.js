@@ -109,6 +109,7 @@ app.put("/api/profile", requireSession, async (req, res) => {
   }
   const user = await updateProfile(req.uid, fields);
   if (!user) return res.status(404).json({ error: "User not found" });
+  matchCache.delete(req.uid);
   res.json({ profile: user.profile });
 });
 
