@@ -189,7 +189,7 @@ app.post("/api/match", requireSession, async (req, res) => {
     // Gemini deep matching
     let geminiMatches = [];
     if (genAI) {
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
       const candidateList = candidates
         .map(
