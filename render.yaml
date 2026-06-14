@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: study-match
+    name: study-matching-app
     runtime: node
     buildCommand: npm install
     startCommand: npm start

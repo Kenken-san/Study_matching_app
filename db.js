@@ -1,5 +1,7 @@
 // In-memory user store. Replace with Postgres/Mongo for production.
 
+import { DUMMY_SCHEDULES } from "./dummy_schedules.js";
+
 const users = new Map(); // id -> user
 const bySub = new Map(); // google_sub -> id
 let nextId = 100; // start at 100; dummy users use ids 1-12
@@ -17,6 +19,7 @@ function emptyProfile() {
     goal: null,
     country: "日本",
     bio: null,
+    busyBlocks: [],
     profileComplete: false,
   };
 }
@@ -268,6 +271,7 @@ const DUMMY_USERS = [
 
 // seed dummy users
 for (const u of DUMMY_USERS) {
+  u.profile.busyBlocks = DUMMY_SCHEDULES[u.id] || [];
   users.set(u.id, u);
   bySub.set(u.google_sub, u.id);
 }

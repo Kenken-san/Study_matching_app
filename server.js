@@ -8,6 +8,7 @@ import {
   sendConnect, acceptConnect, getConnectionStatus, getConnections, getPending,
   addMessage, getMessages,
 } from "./db.js";
+import { sharedFreeWindows, bestSlot, getBusyBlocks } from "./availability.js";
 
 const {
   GOOGLE_CLIENT_ID,
@@ -383,6 +384,112 @@ app.post("/api/coach/:targetId", requireSession, async (req, res) => {
   } catch (err) {
     console.error("Coach error:", err.message);
     res.status(500).json({ error: "コーチデータの生成に失敗しました: " + err.message });
+  }
+});
+
+// --- Availability (privacy-preserving shared free time) ----------------------
+
+// POST /api/availability  { targetId: "..." }
+// Returns ONLY the shared free windows. Never returns either user's busy
+// blocks or any event detail — only the intersection of free time.
+app.post("/api/availability", requireSession, async (req, res) => {
+  try {
+    const { targetId } = req.body;
+    if (!targetId) return res.status(400).json({ error: "targetId is required" });
+
+    const me = await getUser(req.uid);
+    const them = await getUser(targetId);
+    if (!me || !them) return res.status(404).json({ error: "User not found" });
+
+    const myBusy = getBusyBlocks(me);
+    const theirBusy = getBusyBlocks(them);
+
+    const windows = sharedFreeWindows(myBusy, theirBusy, {
+      earliest: "06:00",
+      latest: "24:00",
+      minMinutes: 30,
+      limit: 6,
+    });
+
+    const slot = bestSlot(windows, 25);
+
+    res.json({
+      target: { id: them.id, nickname: them.profile?.nickname || "?" },
+      windows,
+      bestSlot: slot,
+      hasData: myBusy.length > 0 && theirBusy.length > 0,
+      privacyNote:
+        "お互いの予定の中身は共有されません。二人とも空いている時間だけを計算しています。",
+    });
+  } catch (err) {
+    console.error("Availability error:", err.message);
+    res.status(500).json({ error: "空き時間の計算中にエラーが発生しました" });
+  }
+});
+
+// --- Google Calendar connect (free/busy only) --------------------------------
+// Reduces the user's real calendar to anonymous weekly busy blocks and stores
+// them on the profile. We never store event titles/details — only busy times.
+
+function localParts(timeZone, date) {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone, weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false,
+  });
+  const p = Object.fromEntries(dtf.formatToParts(date).map((x) => [x.type, x.value]));
+  const hour = p.hour === "24" ? "00" : p.hour;
+  return { weekday: p.weekday, hhmm: `${hour}:${p.minute}` };
+}
+const DAY_MAP = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
+
+function collapseToWeeklyTemplate(busy, timeZone) {
+  const blocks = [];
+  for (const b of busy) {
+    const s = localParts(timeZone, new Date(b.start));
+    const e = localParts(timeZone, new Date(b.end));
+    if (s.weekday === e.weekday) {
+      blocks.push({ day: DAY_MAP[s.weekday], start: s.hhmm, end: e.hhmm });
+    } else {
+      blocks.push({ day: DAY_MAP[s.weekday], start: s.hhmm, end: "24:00" });
+      blocks.push({ day: DAY_MAP[e.weekday], start: "00:00", end: e.hhmm });
+    }
+  }
+  return blocks;
+}
+
+// POST /api/calendar/connect  { accessToken, timeZone }
+app.post("/api/calendar/connect", requireSession, async (req, res) => {
+  try {
+    const { accessToken, timeZone = "Asia/Tokyo" } = req.body;
+    if (!accessToken) return res.status(400).json({ error: "accessToken required" });
+
+    const now = new Date();
+    const weekLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    const fbRes = await fetch("https://www.googleapis.com/calendar/v3/freeBusy", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        timeMin: now.toISOString(),
+        timeMax: weekLater.toISOString(),
+        timeZone,
+        items: [{ id: "primary" }],
+      }),
+    });
+    const data = await fbRes.json();
+    if (!fbRes.ok) {
+      console.error("FreeBusy error:", JSON.stringify(data));
+      return res.status(502).json({ error: "カレンダーの取得に失敗しました" });
+    }
+    const busy = data.calendars?.primary?.busy || [];
+    const busyBlocks = collapseToWeeklyTemplate(busy, timeZone);
+    await updateProfile(req.uid, { busyBlocks });
+    res.json({ ok: true, blockCount: busyBlocks.length });
+  } catch (err) {
+    console.error("Calendar connect error:", err.message);
+    res.status(500).json({ error: "カレンダー連携中にエラーが発生しました" });
   }
 });
 

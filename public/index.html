@@ -1,123 +1,47 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>StudyMatch — 勉強仲間を見つけよう</title>
+  <title>Sign in</title>
   <script src="https://accounts.google.com/gsi/client" async></script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: system-ui, -apple-system, sans-serif;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      padding: 1rem;
-    }
-    .card {
-      background: white;
-      border-radius: 24px;
-      padding: 3rem 2.5rem;
-      text-align: center;
-      max-width: 420px;
-      width: 100%;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.15);
-    }
-    .logo { font-size: 3rem; margin-bottom: 0.5rem; }
-    h1 { font-size: 1.75rem; color: #1a1a2e; margin-bottom: 0.5rem; }
-    .subtitle { color: #666; font-size: 0.95rem; margin-bottom: 2rem; line-height: 1.5; }
-    .features {
-      text-align: left;
-      background: #f8f9ff;
-      border-radius: 12px;
-      padding: 1rem 1.25rem;
-      margin-bottom: 2rem;
-    }
-    .features li {
-      list-style: none;
-      color: #444;
-      font-size: 0.9rem;
-      padding: 0.3rem 0;
-    }
-    .features li::before { content: "✨ "; }
-    .signin-wrapper { display: flex; justify-content: center; }
-    #status {
-      margin-top: 1rem;
-      font-size: 0.9rem;
-      color: #666;
-      min-height: 1.5rem;
-    }
-    .error { color: #e53e3e; }
+    body { font-family: system-ui, sans-serif; display: grid; place-items: center;
+           min-height: 100vh; margin: 0; background: #fafafa; }
+    .card { text-align: center; }
+    #status { margin-top: 1rem; color: #555; }
   </style>
 </head>
 <body>
   <div class="card">
-    <div class="logo">📚</div>
-    <h1>StudyMatch</h1>
-    <p class="subtitle">AIがあなたの勉強スタイルや目標を読み取り、<br>本当に合う勉強仲間を見つけます。</p>
-
-    <ul class="features">
-      <li>Gemini AIによるディープマッチング</li>
-      <li>浪人・資格・語学・転職など全分野対応</li>
-      <li>「なぜ合うか」を自然な言葉で説明</li>
-    </ul>
-
+    <h1>Welcome</h1>
+    <!-- Replace data-client_id with your real Google OAuth client ID -->
     <div id="g_id_onload"
-         data-client_id="1046552519693-3n1mf8quucql9e2k2pj6ugsm04rgmldq.apps.googleusercontent.com"
-         data-callback="onSignIn"></div>
-    <div class="signin-wrapper">
-      <div class="g_id_signin"
-           data-type="standard"
-           data-theme="filled_blue"
-           data-text="continue_with"
-           data-shape="pill"
-           data-size="large"></div>
-    </div>
+        data-client_id="1046552519693-3n1mf8quucql9e2k2pj6ugsm04rgmldq.apps.googleusercontent.com"
+        data-callback="onSignIn"></div>
+    <div class="g_id_signin" data-type="standard" data-theme="filled_blue"
+         data-text="continue_with" data-shape="pill"></div>
     <p id="status"></p>
   </div>
 
   <script>
-    // If already signed in, go directly to the right page
-    (async () => {
-      try {
-        const r = await fetch("/api/me");
-        if (r.ok) {
-          const { user } = await r.json();
-          if (user.profile?.profileComplete) {
-            location.href = "/match.html";
-          } else {
-            location.href = "/onboarding.html";
-          }
-        }
-      } catch {}
-    })();
-
     async function onSignIn(response) {
-      const el = document.getElementById("status");
-      el.textContent = "サインイン中...";
-      el.className ="";
-      try {
-        const r = await fetch("/api/auth/google", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ credential: response.credential }),
-        });
-        const data = await r.json();
-        if (!r.ok) throw new Error(data.error);
-        // Route based on profile completion
-        if (data.user.profile?.profileComplete) {
-          location.href = "/match.html";
-        } else {
-          location.href = "/onboarding.html";
-        }
-      } catch (err) {
-        el.textContent = "エラー: " + err.message;
-        el.className = "error";
-      }
-    }
+  const r = await fetch("/api/auth/google", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ credential: response.credential }),
+  });
+  const data = await r.json();
+  if (r.ok) {
+    // Go to match if the profile's already complete, else onboarding.
+    location.href = data.user?.profile?.profileComplete
+      ? "/match.html"
+      : "/onboarding.html";
+  } else {
+    document.getElementById("status").textContent = `Error: ${data.error}`;
+  }
+}
+
   </script>
 </body>
 </html>

@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>StudyMatch — マッチング結果</title>
+  <script src="https://accounts.google.com/gsi/client" async></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      background: #f0f2ff;
+      padding: 1.5rem 1rem 3rem;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      max-width: 800px;
+      margin: 0 auto 2rem;
+    }
+    .logo-title { display: flex; align-items: center; gap: 0.5rem; }
+    .logo-title span { font-size: 1.5rem; }
+    .logo-title h1 { font-size: 1.25rem; color: #1a1a2e; }
+    .btn-sm {
+      padding: 0.4rem 0.9rem;
+      border-radius: 8px;
+      border: none;
+      font-size: 0.85rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .btn-logout { background: #f0f0f0; color: #666; }
+    .btn-logout:hover { background: #e0e0e0; }
+
+    .container { max-width: 800px; margin: 0 auto; }
+
+    .section-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #888;
+      margin-bottom: 1rem;
+    }
+
+    /* Comparison header */
+    .compare-header {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 0.75rem;
+    }
+    .compare-label {
+      text-align: center;
+      padding: 0.5rem;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+    .label-gemini { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+    .label-tag { background: #e2e8f0; color: #555; }
+
+    /* Match cards grid */
+    .cards-pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    .match-card {
+      background: white;
+      border-radius: 16px;
+      padding: 1.25rem;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+      position: relative;
+    }
+    .match-card.gemini-card { border-top: 3px solid #667eea; }
+    .match-card.tag-card { border-top: 3px solid #a0aec0; }
+
+    .rank-badge {
+      position: absolute;
+      top: -10px;
+      left: 1rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 2px 10px;
+      border-radius: 20px;
+    }
+    .gemini-card .rank-badge { background: #667eea; color: white; }
+    .tag-card .rank-badge { background: #a0aec0; color: white; }
+
+    .card-name {
+      font-weight: 700;
+      font-size: 1rem;
+      color: #1a1a2e;
+      margin-top: 0.5rem;
+      margin-bottom: 0.25rem;
+    }
+    .card-affiliation {
+      font-size: 0.8rem;
+      color: #888;
+      margin-bottom: 0.75rem;
+    }
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-bottom: 0.75rem;
+    }
+    .tag {
+      font-size: 0.72rem;
+      padding: 2px 8px;
+      border-radius: 20px;
+      background: #eef0ff;
+      color: #667eea;
+      font-weight: 600;
+    }
+    .score-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .score-label { font-size: 0.75rem; color: #888; white-space: nowrap; }
+    .score-bar-wrap {
+      flex: 1;
+      height: 6px;
+      background: #eee;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .score-bar {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.8s ease;
+    }
+    .gemini-card .score-bar { background: linear-gradient(90deg, #667eea, #764ba2); }
+    .tag-card .score-bar { background: #a0aec0; }
+    .score-num { font-size: 0.75rem; font-weight: 700; color: #555; }
+
+    .reason-box {
+      background: #f8f9ff;
+      border-radius: 8px;
+      padding: 0.6rem 0.75rem;
+      font-size: 0.82rem;
+      color: #444;
+      line-height: 1.55;
+      font-style: italic;
+    }
+    .tag-card .reason-box {
+      background: #f7f7f7;
+      color: #666;
+      font-style: normal;
+    }
+
+    /* Diff insight */
+    .diff-insight {
+      background: linear-gradient(135deg, #667eea11, #764ba211);
+      border: 1px solid #667eea33;
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      margin: 1.5rem 0;
+      font-size: 0.875rem;
+      color: #444;
+      line-height: 1.6;
+    }
+    .diff-insight strong { color: #667eea; }
+
+    /* Loading */
+    .loading {
+      text-align: center;
+      padding: 4rem 0;
+      color: #888;
+    }
+    .spinner {
+      width: 48px; height: 48px;
+      border: 4px solid #e2e8f0;
+      border-top-color: #667eea;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 1rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error-box {
+      background: #fff5f5;
+      border: 1px solid #fed7d7;
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      color: #e53e3e;
+      text-align: center;
+      margin: 2rem 0;
+    }
+
+    .btn-retry {
+      margin-top: 0.75rem;
+      padding: 0.6rem 1.5rem;
+      background: #667eea;
+      color: white;
+      border-radius: 10px;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    @media (max-width: 520px) {
+      .compare-header, .cards-pair { grid-template-columns: 1fr; }
+    }
+
+    .btn-avail {
+      width: 100%;
+      margin-top: 0.6rem;
+      padding: 0.5rem;
+      background: #eef0ff;
+      color: #667eea;
+      border: 1px solid #667eea44;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-avail:hover { background: #e0e4ff; }
+    .btn-avail:disabled { opacity: 0.6; cursor: default; }
+    .avail-list {
+      list-style: none;
+      margin: 0.6rem 0 0;
+      padding: 0;
+      font-size: 0.8rem;
+      color: #444;
+    }
+    .avail-list li {
+      padding: 3px 0;
+      border-bottom: 1px solid #f0f0f5;
+    }
+    .avail-slot {
+      margin-top: 0.5rem;
+      padding: 0.4rem 0.6rem;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-align: center;
+    }
+    .avail-note {
+      margin-top: 0.5rem;
+      font-size: 0.7rem;
+      color: #888;
+      line-height: 1.4;
+    }
+    .avail-empty {
+      margin-top: 0.6rem;
+      font-size: 0.8rem;
+      color: #999;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo-title">
+      <span>📚</span>
+      <h1>StudyMatch</h1>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn-sm btn-logout" onclick="connectCalendar()" id="btn-cal">📅 カレンダー連携</button>
+      <button class="btn-sm btn-logout" onclick="goProfile()">プロフィール編集</button>
+      <button class="btn-sm btn-logout" onclick="logout()">ログアウト</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <div id="content">
+      <div class="loading">
+        <div class="spinner"></div>
+        <p>Gemini AIがあなたに合う仲間を探しています…</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const CLIENT_ID = "1046552519693-3n1mf8quucql9e2k2pj6ugsm04rgmldq.apps.googleusercontent.com";
+    let calTokenClient = null;
+
+    function initCal() {
+      if (!window.google?.accounts?.oauth2) { setTimeout(initCal, 300); return; }
+      calTokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: "https://www.googleapis.com/auth/calendar.freebusy",
+        callback: async (resp) => {
+          if (resp.error) { alert("カレンダー連携に失敗しました: " + resp.error); return; }
+          const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          try {
+            const r = await fetch("/api/calendar/connect", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ accessToken: resp.access_token, timeZone: tz }),
+            });
+            const d = await r.json();
+            if (r.ok) {
+              document.getElementById("btn-cal").textContent = `📅 連携済み (${d.blockCount}件)`;
+              alert(`カレンダー連携完了：${d.blockCount}件の予定を反映しました`);
+            } else {
+              alert("エラー: " + (d.error || "不明なエラー"));
+            }
+          } catch (e) {
+            alert("通信エラー: " + e.message);
+          }
+        },
+      });
+    }
+    function connectCalendar() {
+      if (!calTokenClient) { alert("準備中です。数秒後にもう一度お試しください。"); return; }
+      calTokenClient.requestAccessToken();
+    }
+    window.addEventListener("load", initCal);
+
+    async function logout() {
+      await fetch("/api/auth/logout", { method: "POST" });
+      location.href = "/";
+    }
+
+    function goProfile() {
+      location.href = "/onboarding.html";
+    }
+
+    function renderMatches(data) {
+      const { geminiMatches, tagMatches } = data;
+      const container = document.getElementById("content");
+
+      if (!geminiMatches.length && !tagMatches.length) {
+        container.innerHTML = '<div class="error-box">マッチング候補が見つかりませんでした。</div>';
+        return;
+      }
+
+      // Build diff insight
+      const diffNames = geminiMatches.map((m) => m.nickname).join("、");
+      const tagNames = tagMatches.map((m) => m.nickname).join("、");
+      const hasDiff = diffNames !== tagNames;
+
+      let html = "";
+
+      // Comparison labels
+      html += `<div class="compare-header">
+        <div class="compare-label label-gemini">🤖 Gemini AIマッチ</div>
+        <div class="compare-label label-tag">🏷️ タグだけのマッチ</div>
+      </div>`;
+
+      // Cards pair
+      const maxRows = Math.max(geminiMatches.length, tagMatches.length);
+      for (let i = 0; i < maxRows; i++) {
+        const g = geminiMatches[i];
+        const t = tagMatches[i];
+        html += `<div class="cards-pair">`;
+
+        if (g) {
+          html += `<div class="match-card gemini-card">
+            <span class="rank-badge">#${i + 1} Gemini</span>
+            <div class="card-name">${esc(g.nickname)}</div>
+            <div class="card-affiliation">${esc(g.affiliation)}</div>
+            <div class="tags">${(g.studyFields || []).slice(0, 4).map((f) => `<span class="tag">${esc(f)}</span>`).join("")}</div>
+            <div class="score-row">
+              <span class="score-label">AI相性</span>
+              <div class="score-bar-wrap"><div class="score-bar" style="width:${g.geminiScore ?? 0}%"></div></div>
+              <span class="score-num">${g.geminiScore ?? "-"}%</span>
+            </div>
+            <div class="score-row">
+              <span class="score-label">タグ一致</span>
+              <div class="score-bar-wrap"><div class="score-bar" style="width:${g.tagScore ?? 0}%"></div></div>
+              <span class="score-num">${g.tagScore ?? 0}%</span>
+            </div>
+            <div class="reason-box">「${esc(g.reason || "")}」</div>
+            <button class="btn-avail" onclick="showAvailability('${esc(g.id)}', this)">📅 共通の空き時間を見る</button>
+            <div class="avail-result" id="avail-${esc(g.id)}"></div>
+          </div>`;
+        } else {
+          html += `<div></div>`;
+        }
+
+        if (t) {
+          html += `<div class="match-card tag-card">
+            <span class="rank-badge">#${i + 1} タグ</span>
+            <div class="card-name">${esc(t.nickname)}</div>
+            <div class="card-affiliation">${esc(t.affiliation)}</div>
+            <div class="tags">${(t.studyFields || []).slice(0, 4).map((f) => `<span class="tag">${esc(f)}</span>`).join("")}</div>
+            <div class="score-row">
+              <span class="score-label">タグ一致</span>
+              <div class="score-bar-wrap"><div class="score-bar" style="width:${t.tagScore ?? 0}%"></div></div>
+              <span class="score-num">${t.tagScore ?? 0}%</span>
+            </div>
+            <div class="reason-box" style="font-style:normal;color:#888">
+              共通タグ: ${(t.studyFields || []).join(", ") || "なし"}
+            </div>
+          </div>`;
+        } else {
+          html += `<div></div>`;
+        }
+
+        html += `</div>`;
+      }
+
+      // Diff insight block
+      if (hasDiff) {
+        html += `<div class="diff-insight">
+          <strong>💡 タグでは読めないものをGeminiが読みました</strong><br>
+          タグマッチの上位は <strong>${esc(tagNames)}</strong> でしたが、
+          Geminiは勉強スタイルや感情的なニーズを読み取り
+          <strong>${esc(diffNames)}</strong> を選びました。
+          同じタグでも、目標への本気度や孤独感・仲間への期待値など、
+          文章でしか伝わらない相性があります。
+        </div>`;
+      } else {
+        html += `<div class="diff-insight">
+          タグマッチとGeminiマッチが一致しました。分野の一致度が高く、かつ文章からも深い相性が確認されています。
+        </div>`;
+      }
+
+      container.innerHTML = html;
+    }
+
+    function esc(str) {
+      return String(str ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    async function showAvailability(targetId, btn) {
+      const box = document.getElementById("avail-" + targetId);
+      btn.disabled = true;
+      btn.textContent = "計算中…";
+      try {
+        const r = await fetch("/api/availability", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ targetId }),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || "エラー");
+
+        if (!d.windows || d.windows.length === 0) {
+          box.innerHTML = `<div class="avail-empty">共通の空き時間が見つかりませんでした。</div>`;
+        } else {
+          const lines = d.windows
+            .slice()
+            .sort((a, b) => a.day - b.day || a.start.localeCompare(b.start))
+            .map((w) => {
+              const span = (w.start === "06:00" && w.end === "24:00")
+                ? "終日" : `${w.start}〜${w.end}`;
+              return `<li>${esc(w.dayLabel)}曜: ${esc(span)}</li>`;
+            })
+            .join("");
+          const anchor = d.bestSlot
+            ? `<div class="avail-slot">おすすめ: 毎週 ${esc(d.bestSlot.label)}</div>` : "";
+          box.innerHTML = `
+            <ul class="avail-list">${lines}</ul>
+            ${anchor}
+            <div class="avail-note">🔒 ${esc(d.privacyNote)}</div>`;
+        }
+        btn.style.display = "none";
+      } catch (e) {
+        box.innerHTML = `<div class="avail-empty">${esc(e.message)}</div>`;
+        btn.disabled = false;
+        btn.textContent = "📅 共通の空き時間を見る";
+      }
+    }
+
+    async function loadMatches() {
+      const container = document.getElementById("content");
+      try {
+        const r = await fetch("/api/match", { method: "POST" });
+        const data = await r.json();
+        if (!r.ok) {
+          if (r.status === 400 && data.error?.includes("プロフィール")) {
+            container.innerHTML = `<div class="error-box">
+              プロフィールを完成させてからマッチングできます。
+              <br><button class="btn-retry" onclick="location.href='/onboarding.html'">プロフィールを設定する</button>
+            </div>`;
+          } else {
+            throw new Error(data.error || "エラーが発生しました");
+          }
+          return;
+        }
+        renderMatches(data);
+      } catch (err) {
+        container.innerHTML = `<div class="error-box">
+          ${esc(err.message)}
+          <br><button class="btn-retry" onclick="loadMatches()">再試行</button>
+        </div>`;
+      }
+    }
+
+    // Check auth then load
+    (async () => {
+      try {
+        const r = await fetch("/api/me");
+        if (!r.ok) { location.href = "/"; return; }
+        await loadMatches();
+      } catch {
+        location.href = "/";
+      }
+    })();
+  </script>
+</body>
+</html>
