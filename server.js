@@ -422,8 +422,8 @@ app.post("/api/availability", requireSession, async (req, res) => {
       target: { id: them.id, nickname: them.profile?.nickname || "?" },
       windows,
       bestSlot: slot,
-      hasData: theirBusy.length > 0,
-      myHasData: myBusy.length > 0,
+      hasData: !!(them.profile?.calendarConnected),
+      myHasData: !!(me.profile?.calendarConnected),
       privacyNote:
         "お互いの予定の中身は共有されません。二人とも空いている時間だけを計算しています。",
     });
@@ -491,7 +491,7 @@ app.post("/api/calendar/connect", requireSession, async (req, res) => {
     }
     const busy = data.calendars?.primary?.busy || [];
     const busyBlocks = collapseToWeeklyTemplate(busy, timeZone);
-    await updateProfile(req.uid, { busyBlocks });
+    await updateProfile(req.uid, { busyBlocks, calendarConnected: true });
     res.json({ ok: true, blockCount: busyBlocks.length });
   } catch (err) {
     console.error("Calendar connect error:", err.message);

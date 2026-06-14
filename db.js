@@ -20,6 +20,7 @@ function emptyProfile() {
     country: "日本",
     bio: null,
     busyBlocks: [],
+    calendarConnected: false,
     profileComplete: false,
   };
 }
