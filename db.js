@@ -18,7 +18,37 @@ function emptyProfile() {
     country: "日本",
     bio: null,
     profileComplete: false,
+    embedding: null,
   };
+}
+
+export function cosineSimilarity(vecA, vecB) {
+  if (!vecA?.length || !vecB?.length || vecA.length !== vecB.length) return 0;
+  let dot = 0, magA = 0, magB = 0;
+  for (let i = 0; i < vecA.length; i++) {
+    dot += vecA[i] * vecB[i];
+    magA += vecA[i] * vecA[i];
+    magB += vecB[i] * vecB[i];
+  }
+  const denom = Math.sqrt(magA) * Math.sqrt(magB);
+  return denom === 0 ? 0 : dot / denom;
+}
+
+export async function initDummyEmbeddings(embedFn) {
+  for (const u of users.values()) {
+    if (u.profile?.profileComplete && !u.profile.embedding) {
+      const text = [
+        u.profile.affiliation,
+        (u.profile.studyFields || []).join(", "),
+        u.profile.goal,
+        u.profile.bio,
+      ].filter(Boolean).join(" ");
+      if (text) {
+        const embedding = await embedFn(text);
+        if (embedding) u.profile.embedding = embedding;
+      }
+    }
+  }
 }
 
 // ---------- dummy users (P1) -------------------------------------------------
