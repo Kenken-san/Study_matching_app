@@ -3,142 +3,23 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>StudyMatch — プロフィール設定</title>
+  <title>peers — プロフィール設定</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="stylesheet" href="/peers.css" />
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: system-ui, -apple-system, sans-serif;
-      min-height: 100vh;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 1rem;
-    }
-    .card {
-      background: white;
-      border-radius: 24px;
-      padding: 2.5rem 2rem;
-      max-width: 500px;
-      width: 100%;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.15);
-    }
-    .progress-bar {
-      display: flex;
-      gap: 6px;
-      margin-bottom: 2rem;
-    }
-    .progress-step {
-      flex: 1;
-      height: 4px;
-      border-radius: 2px;
-      background: #e2e8f0;
-      transition: background 0.3s;
-    }
-    .progress-step.done { background: #667eea; }
-    .step { display: none; }
-    .step.active { display: block; }
-    .step-label {
-      font-size: 0.8rem;
-      color: #667eea;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-bottom: 0.5rem;
-    }
-    h2 { font-size: 1.4rem; color: #1a1a2e; margin-bottom: 0.4rem; }
-    .hint { color: #888; font-size: 0.875rem; margin-bottom: 1.5rem; line-height: 1.5; }
-    input[type="text"], input[type="number"], textarea, select {
-      width: 100%;
-      padding: 0.75rem 1rem;
-      border: 2px solid #e2e8f0;
-      border-radius: 12px;
-      font-size: 1rem;
-      font-family: inherit;
-      transition: border-color 0.2s;
-      outline: none;
-    }
-    input:focus, textarea:focus, select:focus { border-color: #667eea; }
-    textarea { min-height: 120px; resize: vertical; }
-    .options-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-      gap: 8px;
-      margin-bottom: 0.5rem;
-    }
-    .option-chip {
-      padding: 0.5rem 0.75rem;
-      border: 2px solid #e2e8f0;
-      border-radius: 20px;
-      text-align: center;
-      font-size: 0.85rem;
-      cursor: pointer;
-      transition: all 0.2s;
-      user-select: none;
-      color: #444;
-    }
-    .option-chip:hover { border-color: #667eea; color: #667eea; }
-    .option-chip.selected {
-      background: #667eea;
-      border-color: #667eea;
-      color: white;
-    }
-    .radio-group { display: flex; flex-direction: column; gap: 8px; }
-    .radio-option {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      padding: 0.75rem 1rem;
-      border: 2px solid #e2e8f0;
-      border-radius: 12px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .radio-option:hover { border-color: #667eea; }
-    .radio-option.selected { border-color: #667eea; background: #f0f0ff; }
-    .radio-option input { display: none; }
-    .radio-dot {
-      width: 18px; height: 18px;
-      border: 2px solid #ccc;
-      border-radius: 50%;
-      flex-shrink: 0;
-      transition: all 0.2s;
-    }
-    .radio-option.selected .radio-dot {
-      border-color: #667eea;
-      background: #667eea;
-    }
-    .nav {
-      display: flex;
-      gap: 12px;
-      margin-top: 2rem;
-    }
-    button {
-      flex: 1;
-      padding: 0.85rem;
-      border: none;
-      border-radius: 12px;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .btn-back {
-      background: #f7f7f7;
-      color: #666;
-    }
-    .btn-back:hover { background: #eee; }
-    .btn-next {
-      background: linear-gradient(135deg, #667eea, #764ba2);
-      color: white;
-      box-shadow: 0 4px 15px rgba(102,126,234,0.4);
-    }
-    .btn-next:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(102,126,234,0.5); }
-    .btn-next:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-    #error-msg { color: #e53e3e; font-size: 0.875rem; margin-top: 0.75rem; min-height: 1.25rem; }
+    body { background: radial-gradient(1200px 600px at 50% -10%, var(--teal-100), transparent 60%), var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 1.5rem 1rem; }
+    .brand-top { margin-bottom: 1.5rem; }
   </style>
 </head>
 <body>
+  <div class="brand-top">
+    <a class="brand" href="/">
+      <svg class="brand-mark" width="28" height="28" viewBox="0 0 120 120" aria-hidden="true"><rect width="120" height="120" rx="26" fill="#5dc8cd"/><g transform="translate(60,62) rotate(-18)"><path d="M 0,-26 C -10,-32 -25,-32 -35,-27 L -35,24 C -25,18 -10,18 0,25 C 10,18 25,18 35,24 L 35,-27 C 25,-32 10,-32 0,-26 Z" fill="#fff"/><path d="M 0,-26 L 0,25" stroke="#5dc8cd" stroke-width="3" stroke-linecap="round"/></g></svg>
+      <span class="brand-word">peers</span>
+    </a>
+  </div>
+
   <div class="card">
     <div class="progress-bar">
       <div class="progress-step" id="ps1"></div>
@@ -152,38 +33,17 @@
     <div class="step active" id="step-1">
       <div class="step-label">ステップ 1 / 5</div>
       <h2>ニックネームを教えてください</h2>
-      <p class="hint">アプリ内で表示される名前です。本名でなくてもOKです。</p>
-      <input type="text" id="nickname" placeholder="例：たろう、Hana、受験生A" maxlength="20" />
+      <p class="hint">アプリ内で表示される名前です。本名でなくてもOK。</p>
+      <input type="text" id="nickname" placeholder="例：たろう、Hana、夜型勉強マン" maxlength="20" />
     </div>
 
-    <!-- Step 2: Affiliation -->
+    <!-- Step 2: Goal (where you WANT to be) -->
     <div class="step" id="step-2">
       <div class="step-label">ステップ 2 / 5</div>
-      <h2>現在の所属を教えてください</h2>
-      <p class="hint">最も近いものを選んでください。</p>
-      <div class="radio-group" id="affiliation-group">
-        <label class="radio-option" onclick="selectRadio('affiliation', '高校生', this)">
-          <div class="radio-dot"></div><span>高校生</span>
-        </label>
-        <label class="radio-option" onclick="selectRadio('affiliation', '浪人生', this)">
-          <div class="radio-dot"></div><span>浪人生</span>
-        </label>
-        <label class="radio-option" onclick="selectRadio('affiliation', '大学生・大学院生', this)">
-          <div class="radio-dot"></div><span>大学生・大学院生</span>
-        </label>
-        <label class="radio-option" onclick="selectRadio('affiliation', '専門学校生', this)">
-          <div class="radio-dot"></div><span>専門学校生</span>
-        </label>
-        <label class="radio-option" onclick="selectRadio('affiliation', '社会人（会社員）', this)">
-          <div class="radio-dot"></div><span>社会人（会社員）</span>
-        </label>
-        <label class="radio-option" onclick="selectRadio('affiliation', '社会人（フリーランス・経営者）', this)">
-          <div class="radio-dot"></div><span>社会人（フリーランス・経営者）</span>
-        </label>
-        <label class="radio-option" onclick="selectRadio('affiliation', 'その他', this)">
-          <div class="radio-dot"></div><span>その他</span>
-        </label>
-      </div>
+      <h2>目指していることを教えてください</h2>
+      <p class="hint">期限や具体的な数値があると、より合う仲間が見つかります。今どこにいるかではなく、どこに向かっているかを書いてください。</p>
+      <input type="text" id="goal"
+        placeholder="例：今年12月までにTOEIC 800点突破、来年3月に早稲田法学部合格" maxlength="100" />
     </div>
 
     <!-- Step 3: Study fields -->
@@ -191,26 +51,28 @@
       <div class="step-label">ステップ 3 / 5</div>
       <h2>勉強中の分野を選んでください</h2>
       <p class="hint">複数選択できます。</p>
-      <div class="options-grid" id="fields-grid">
-        <!-- dynamically rendered -->
-      </div>
+      <div class="options-grid" id="fields-grid"></div>
     </div>
 
-    <!-- Step 4: Goal -->
+    <!-- Step 4: Public bio (vision to share) -->
     <div class="step" id="step-4">
       <div class="step-label">ステップ 4 / 5</div>
-      <h2>最終目標を教えてください</h2>
-      <p class="hint">期限や具体的な数値があると、より良い仲間が見つかります。</p>
-      <input type="text" id="goal"
-        placeholder="例：今年12月までにTOEIC 800点突破" maxlength="100" />
+      <h2>仲間に見せるビジョンを書いてください</h2>
+      <p class="hint">目標・熱量・どんな仲間と学びたいか。これが相手に公開されるあなたのプロフィールになります。</p>
+      <textarea id="publicBio" placeholder="例：来年の3月に早稲田法学部合格という夢に向かって、毎朝6時から全力で取り組んでいます。同じ志を持つ仲間と励まし合いながら進みたいです。"></textarea>
     </div>
 
-    <!-- Step 5: Bio -->
+    <!-- Step 5: Private reality (AI only) -->
     <div class="step" id="step-5">
       <div class="step-label">ステップ 5 / 5</div>
-      <h2>あなたの今の状況を教えてください</h2>
-      <p class="hint">勉強を始めた理由、今の悩み、どんな仲間が欲しいか——自由に書いてください。AIがここを読んで、本当に合う人を見つけます。</p>
-      <textarea id="bio" placeholder="例：浪人中でなかなか周りに仲間がいなくて孤独を感じています。毎朝6時から勉強しているので、朝型の人と励まし合えたら嬉しいです…"></textarea>
+      <div class="private-badge">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4" stroke-linecap="round"/></svg>
+        AIのみ・他の人には非公開
+      </div>
+      <h2>今の正直な状況を教えてください</h2>
+      <p class="hint">今の成績・悩み・置かれた状況など、本音を書いてください。AIがここを読んで、本当に合う人を見つけます。</p>
+      <div class="disclaimer">ここに書いた内容は他のユーザーには一切公開されません。AIがマッチングの参考にするだけです。</div>
+      <textarea id="privateReality" placeholder="例：浪人中で共通テストは600点台。英語は得意だが数学が苦手で、去年は本番でパニックになった経験があります。周りに同じ境遇の友達がおらず孤独を感じています…"></textarea>
     </div>
 
     <div id="error-msg"></div>
@@ -225,7 +87,7 @@
     const STUDY_FIELDS = [
       "大学受験", "大学院受験", "高校受験",
       "TOEIC", "TOEFL", "英会話", "英語",
-      "韓国語", "中国語", "フランス語",
+      "韓国語", "中国語", "フランス語", "スペイン語",
       "公認会計士", "税理士", "行政書士", "宅建", "簿記",
       "プログラミング", "Python", "JavaScript", "React",
       "データ分析", "機械学習", "AI",
@@ -240,13 +102,12 @@
       currentStep: 1,
       totalSteps: 5,
       nickname: "",
-      affiliation: "",
-      studyFields: [],
       goal: "",
-      bio: "",
+      studyFields: [],
+      publicBio: "",
+      privateReality: "",
     };
 
-    // Build fields grid
     const grid = document.getElementById("fields-grid");
     for (const f of STUDY_FIELDS) {
       const chip = document.createElement("div");
@@ -263,14 +124,6 @@
       grid.appendChild(chip);
     }
 
-    function selectRadio(field, value, el) {
-      state[field] = value;
-      document.querySelectorAll(`#${field}-group .radio-option`).forEach((o) =>
-        o.classList.remove("selected")
-      );
-      el.classList.add("selected");
-    }
-
     function updateProgress() {
       for (let i = 1; i <= state.totalSteps; i++) {
         document.getElementById(`ps${i}`).classList.toggle("done", i < state.currentStep);
@@ -278,7 +131,7 @@
       document.getElementById("btn-back").style.display =
         state.currentStep > 1 ? "block" : "none";
       document.getElementById("btn-next").textContent =
-        state.currentStep === state.totalSteps ? "マッチングへ ✨" : "次へ →";
+        state.currentStep === state.totalSteps ? "マッチングへ →" : "次へ →";
     }
 
     function showStep(n) {
@@ -291,35 +144,27 @@
 
     function validate() {
       const s = state.currentStep;
-      if (s === 1 && !document.getElementById("nickname").value.trim()) {
+      if (s === 1 && !document.getElementById("nickname").value.trim())
         return "ニックネームを入力してください";
-      }
-      if (s === 2 && !state.affiliation) {
-        return "所属を選択してください";
-      }
-      if (s === 3 && state.studyFields.length === 0) {
-        return "分野を1つ以上選択してください";
-      }
-      if (s === 4 && !document.getElementById("goal").value.trim()) {
+      if (s === 2 && !document.getElementById("goal").value.trim())
         return "目標を入力してください";
-      }
-      if (s === 5 && document.getElementById("bio").value.trim().length < 20) {
-        return "自己紹介をもう少し詳しく書いてください（20文字以上）";
-      }
+      if (s === 3 && state.studyFields.length === 0)
+        return "分野を1つ以上選択してください";
+      if (s === 4 && document.getElementById("publicBio").value.trim().length < 20)
+        return "ビジョンをもう少し詳しく書いてください（20文字以上）";
+      if (s === 5 && document.getElementById("privateReality").value.trim().length < 20)
+        return "今の状況をもう少し詳しく書いてください（20文字以上）";
       return null;
     }
 
     async function nextStep() {
       const err = validate();
-      if (err) {
-        document.getElementById("error-msg").textContent = err;
-        return;
-      }
+      if (err) { document.getElementById("error-msg").textContent = err; return; }
 
-      // collect values
       state.nickname = document.getElementById("nickname").value.trim();
       state.goal = document.getElementById("goal").value.trim();
-      state.bio = document.getElementById("bio").value.trim();
+      state.publicBio = document.getElementById("publicBio")?.value.trim() || state.publicBio;
+      state.privateReality = document.getElementById("privateReality")?.value.trim() || state.privateReality;
 
       if (state.currentStep < state.totalSteps) {
         showStep(state.currentStep + 1);
@@ -335,7 +180,7 @@
     async function submitProfile() {
       const btn = document.getElementById("btn-next");
       btn.disabled = true;
-      btn.textContent = "保存中...";
+      btn.textContent = "保存中…";
       document.getElementById("error-msg").textContent = "";
 
       try {
@@ -344,10 +189,10 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             nickname: state.nickname,
-            affiliation: state.affiliation,
-            studyFields: state.studyFields,
             goal: state.goal,
-            bio: state.bio,
+            studyFields: state.studyFields,
+            publicBio: state.publicBio,
+            privateReality: state.privateReality,
           }),
         });
         if (!r.ok) {
@@ -358,11 +203,10 @@
       } catch (err) {
         document.getElementById("error-msg").textContent = err.message;
         btn.disabled = false;
-        btn.textContent = "マッチングへ ✨";
+        btn.textContent = "マッチングへ →";
       }
     }
 
-    // Check auth on load
     (async () => {
       try {
         const r = await fetch("/api/me");

@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>peers — グループ</title>
+  <link rel="stylesheet" href="/peers.css" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <style>
+    /* group-page specifics layered on the shared design system */
+    .btn-pending-state {
+      padding: 0.6rem 1.05rem; background: var(--teal-50); color: var(--teal-700);
+      border: 1px solid var(--teal-100); border-radius: var(--r-md);
+      font-family: inherit; font-size: 0.82rem; font-weight: 600; cursor: default;
+      display: inline-flex; align-items: center; gap: 5px;
+    }
+    .creator-badge {
+      display: inline-block; font-size: 0.68rem; font-weight: 700; color: var(--teal-800);
+      background: var(--teal-50); border: 1px solid var(--teal-100);
+      padding: 2px 8px; border-radius: var(--r-pill); margin-left: 0.5rem; vertical-align: middle;
+    }
+    /* pending-requests panel (creator only) */
+    .requests-panel {
+      margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed var(--teal-200);
+    }
+    .requests-title { font-size: 0.78rem; font-weight: 700; color: var(--teal-800); margin-bottom: 0.6rem; }
+    .request-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+      padding: 0.6rem 0.8rem; background: var(--teal-50); border-radius: var(--r-sm); margin-bottom: 0.5rem;
+    }
+    .request-info { min-width: 0; }
+    .request-name { font-size: 0.88rem; font-weight: 600; color: var(--ink); }
+    .request-goal { font-size: 0.74rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .request-actions { display: flex; gap: 0.4rem; flex-shrink: 0; }
+    .btn-approve {
+      padding: 0.4rem 0.85rem; background: var(--teal); color: #fff; border: none;
+      border-radius: var(--r-sm); font-family: inherit; font-size: 0.76rem; font-weight: 600; cursor: pointer;
+    }
+    .btn-approve:hover { background: var(--teal-600); }
+    .btn-reject {
+      padding: 0.4rem 0.85rem; background: #fff; color: var(--muted); border: 1px solid var(--line);
+      border-radius: var(--r-sm); font-family: inherit; font-size: 0.76rem; font-weight: 600; cursor: pointer;
+    }
+    .btn-reject:hover { background: var(--danger-bg); color: var(--danger); border-color: #f3c9c7; }
+    .req-count-pill {
+      display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px;
+      padding: 0 5px; margin-left: 4px; background: var(--danger); color: #fff;
+      border-radius: 9px; font-size: 0.66rem; font-weight: 700;
+    }
+    /* AI suggestions */
+    .suggest-bar { margin-bottom: 1.5rem; }
+    .btn-suggest {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 0.7rem 1.3rem; background: var(--surface); color: var(--teal-800);
+      border: 1.5px solid var(--teal-200); border-radius: var(--r-pill);
+      font-family: inherit; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.15s;
+    }
+    .btn-suggest:hover { background: var(--teal-50); border-color: var(--teal); }
+    .btn-suggest:disabled { opacity: 0.6; cursor: default; }
+    .suggest-section { margin-bottom: 2rem; }
+    .suggest-heading {
+      display: flex; align-items: center; gap: 8px; font-family: var(--font-display);
+      font-size: 1.05rem; font-weight: 700; color: var(--ink); margin-bottom: 0.25rem;
+    }
+    .suggest-sub { font-size: 0.8rem; color: var(--muted); margin-bottom: 1rem; }
+    .suggest-card {
+      background: var(--surface); border: 1.5px solid var(--teal-200); border-radius: var(--r-lg);
+      padding: 1.25rem 1.5rem; margin-bottom: 0.875rem;
+    }
+    .suggest-reason {
+      font-size: 0.85rem; color: var(--teal-800); background: var(--teal-50);
+      border-radius: var(--r-sm); padding: 0.7rem 0.9rem; margin: 0.6rem 0 0.875rem; line-height: 1.6;
+    }
+    .suggest-reason::before { content: "AI　"; font-weight: 700; color: var(--teal-600); }
+    .divider-label {
+      display: flex; align-items: center; gap: 0.75rem; margin: 0 0 1.25rem;
+      font-size: 0.78rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .divider-label::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+    /* group schedule panel */
+    .group-schedule {
+      margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed var(--teal-200);
+    }
+    .schedule-header {
+      font-size: 0.78rem; font-weight: 700; color: var(--teal-800); margin-bottom: 0.75rem;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .best-slot-row {
+      display: flex; align-items: center; gap: 0.6rem;
+      background: var(--teal-50); border: 1px solid var(--teal-200); border-radius: var(--r-md);
+      padding: 0.6rem 0.9rem; margin-bottom: 0.75rem;
+    }
+    .best-slot-label { font-size: 0.72rem; font-weight: 700; color: var(--teal-800); }
+    .best-slot-time { font-size: 1rem; font-weight: 700; color: var(--teal-700); }
+    .schedule-windows { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 0.6rem; }
+    .schedule-chip {
+      font-size: 0.73rem; padding: 3px 10px; background: var(--teal-50);
+      border: 1px solid var(--teal-200); border-radius: var(--r-pill); color: var(--teal-800); font-weight: 600;
+    }
+    .schedule-ai-note {
+      font-size: 0.82rem; color: var(--teal-800); background: var(--teal-50);
+      border-left: 3px solid var(--teal); border-radius: 0 var(--r-sm) var(--r-sm) 0;
+      padding: 0.6rem 0.9rem; margin-top: 0.6rem; line-height: 1.6;
+    }
+    .schedule-ai-note::before { content: "Gemini  "; font-weight: 700; color: var(--teal-600); }
+    .schedule-privacy { font-size: 0.68rem; color: var(--muted); margin-top: 0.5rem; }
+    .schedule-no-data { font-size: 0.82rem; color: var(--muted); line-height: 1.7; }
+    .btn-schedule {
+      padding: 0.5rem 1rem; background: var(--surface); color: var(--ink);
+      border: 1.5px solid var(--line); border-radius: var(--r-md); font-family: inherit;
+      font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.15s;
+    }
+    .btn-schedule:hover { background: var(--teal-50); border-color: var(--teal-200); color: var(--teal-800); }
+    .btn-schedule:disabled { opacity: 0.6; cursor: default; }
+  </style>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a class="logo" href="/match.html">
+      <svg class="brand-mark" width="26" height="26" viewBox="0 0 120 120" aria-hidden="true"><rect width="120" height="120" rx="26" fill="#5dc8cd"/><g transform="translate(60,62) rotate(-18)"><path d="M 0,-26 C -10,-32 -25,-32 -35,-27 L -35,24 C -25,18 -10,18 0,25 C 10,18 25,18 35,24 L 35,-27 C 25,-32 10,-32 0,-26 Z" fill="#fff"/><path d="M 0,-26 L 0,25" stroke="#5dc8cd" stroke-width="3" stroke-linecap="round"/></g></svg>
+      peers
+    </a>
+    <nav>
+      <button class="nav-btn" onclick="location.href='/match.html'">マッチ</button>
+      <button class="nav-btn" onclick="location.href='/chat.html'">チャット</button>
+      <button class="nav-btn" onclick="logout()">ログアウト</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">スタディグループ</h1>
+      <p class="page-subtitle">同じ目標を持つ仲間とグループで学ぼう</p>
+    </div>
+    <button class="btn-create" onclick="toggleForm()">＋ グループを作る</button>
+  </div>
+
+  <div class="create-form" id="create-form">
+    <h3>新しいグループを作成</h3>
+    <div class="form-field">
+      <label>グループ名</label>
+      <input type="text" id="gf-name" placeholder="例：TOEIC 800点を目指す会" maxlength="40" />
+    </div>
+    <div class="form-field">
+      <label>説明（任意）</label>
+      <textarea id="gf-desc" placeholder="どんな目標の人向けか、活動スタイルなどを書いてください"></textarea>
+    </div>
+    <div class="form-field">
+      <label>タグ（カンマ区切り）</label>
+      <input type="text" id="gf-tags" placeholder="例：TOEIC, 英語, 社会人" />
+    </div>
+    <div class="form-actions">
+      <button class="btn-form-cancel" onclick="toggleForm()">キャンセル</button>
+      <button class="btn-form-submit" onclick="createGroup()">作成する</button>
+    </div>
+  </div>
+
+  <div class="suggest-bar">
+    <button class="btn-suggest" id="btn-suggest" onclick="loadSuggestions()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v2M12 19v2M5 12H3M21 12h-2M6 6l1.5 1.5M18 18l-1.5-1.5M6 18l1.5-1.5M18 6l-1.5 1.5" stroke-linecap="round"/><circle cx="12" cy="12" r="4"/></svg>
+      AIにおすすめグループを聞く
+    </button>
+  </div>
+  <div id="suggestions"></div>
+
+  <div id="content">
+    <div class="loading">
+      <div class="spinner"></div>
+      <p class="loading-text">グループを読み込み中...</p>
+    </div>
+  </div>
+</main>
+
+<script>
+  let myId = null;
+  let groupsCache = [];
+
+  function esc(str) {
+    return String(str ?? "")
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    location.href = "/";
+  }
+
+  function toggleForm() {
+    const f = document.getElementById("create-form");
+    f.classList.toggle("visible");
+    if (f.classList.contains("visible")) document.getElementById("gf-name").focus();
+  }
+
+  async function createGroup() {
+    const name = document.getElementById("gf-name").value.trim();
+    const desc = document.getElementById("gf-desc").value.trim();
+    const tagsRaw = document.getElementById("gf-tags").value.trim();
+    if (!name) { alert("グループ名を入力してください"); return; }
+    const tags = tagsRaw ? tagsRaw.split(",").map((t) => t.trim()).filter(Boolean) : [];
+    try {
+      const r = await fetch("/api/groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, description: desc, tags }),
+      });
+      if (!r.ok) throw new Error((await r.json()).error || "作成に失敗しました");
+      toggleForm();
+      document.getElementById("gf-name").value = "";
+      document.getElementById("gf-desc").value = "";
+      document.getElementById("gf-tags").value = "";
+      await loadGroups();
+    } catch (e) { alert(e.message); }
+  }
+
+  // Request to join — now goes to the creator's approval queue.
+  async function requestJoin(groupId, btn) {
+    btn.disabled = true;
+    btn.textContent = "申請中...";
+    try {
+      const r = await fetch(`/api/groups/${groupId}/join`, { method: "POST" });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "申請に失敗しました");
+      await loadGroups();
+    } catch (e) {
+      alert(e.message);
+      btn.disabled = false;
+      btn.textContent = "参加を申請";
+    }
+  }
+
+  async function approveRequest(groupId, userId) {
+    try {
+      const r = await fetch(`/api/groups/${groupId}/approve/${userId}`, { method: "PUT" });
+      if (!r.ok) throw new Error((await r.json()).error || "承認に失敗しました");
+      await loadGroups();
+    } catch (e) { alert(e.message); }
+  }
+
+  async function rejectRequest(groupId, userId) {
+    try {
+      const r = await fetch(`/api/groups/${groupId}/reject/${userId}`, { method: "PUT" });
+      if (!r.ok) throw new Error((await r.json()).error || "却下に失敗しました");
+      await loadGroups();
+    } catch (e) { alert(e.message); }
+  }
+
+  // Build the action button based on the viewer's relationship to the group.
+  function actionFor(g) {
+    if (g.isMember) {
+      return `<button class="btn-chat" onclick="location.href='/chat.html'">チャットで開く</button>
+              <span class="btn-joined">参加済み</span>`;
+    }
+    if (g.isPending) {
+      return `<span class="btn-pending-state">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        承認待ち</span>`;
+    }
+    return `<button class="btn-join" onclick="requestJoin('${esc(g.id)}', this)">参加を申請</button>`;
+  }
+
+  // Creator-only panel listing people who requested to join.
+  function requestsPanel(g) {
+    if (!g.isCreator || !g.pendingRequests || g.pendingRequests.length === 0) return "";
+    const rows = g.pendingRequests.map((p) => `
+      <div class="request-row">
+        <div class="request-info">
+          <div class="request-name">${esc(p.nickname)}</div>
+          <div class="request-goal">${esc(p.goal || (p.studyFields || []).join("・"))}</div>
+        </div>
+        <div class="request-actions">
+          <button class="btn-approve" onclick="approveRequest('${esc(g.id)}','${esc(p.userId)}')">承認</button>
+          <button class="btn-reject" onclick="rejectRequest('${esc(g.id)}','${esc(p.userId)}')">却下</button>
+        </div>
+      </div>`).join("");
+    return `<div class="requests-panel">
+      <div class="requests-title">参加申請<span class="req-count-pill">${g.pendingRequests.length}</span></div>
+      ${rows}
+    </div>`;
+  }
+
+  function groupCardHtml(g) {
+    const tags = (g.tags || []).map((t) => `<span class="tag">${esc(t)}</span>`).join("");
+    const desc = g.description ? `<p class="group-desc">${esc(g.description)}</p>` : "";
+    const creatorBadge = g.isCreator ? `<span class="creator-badge">作成者</span>` : "";
+    const scheduleBtn = g.isMember
+      ? `<button class="btn-schedule" onclick="showGroupSchedule('${esc(g.id)}', this)">全員の空き時間を確認</button>` : "";
+    return `<div class="group-card">
+      <div class="group-card-header">
+        <div>
+          <div class="group-name">${esc(g.name)}${creatorBadge}</div>
+          <div class="group-meta">${g.memberCount}人のメンバー</div>
+        </div>
+      </div>
+      ${desc}
+      ${tags ? `<div class="group-tags">${tags}</div>` : ""}
+      <div class="group-actions">${actionFor(g)}${scheduleBtn}</div>
+      <div id="sched-${esc(g.id)}"></div>
+      ${requestsPanel(g)}
+    </div>`;
+  }
+
+  async function loadGroups() {
+    const container = document.getElementById("content");
+    try {
+      const r = await fetch("/api/groups");
+      if (!r.ok) throw new Error("取得に失敗しました");
+      const { groups } = await r.json();
+      groupsCache = groups;
+
+      if (!groups.length) {
+        container.innerHTML = '<div class="empty-state">まだグループがありません。最初のグループを作ってみよう！</div>';
+        return;
+      }
+      // Sort: groups with pending requests I own first, then mine, then the rest.
+      const sorted = [...groups].sort((a, b) => {
+        const ap = (a.isCreator && a.pendingCount) ? 2 : a.isMember ? 1 : 0;
+        const bp = (b.isCreator && b.pendingCount) ? 2 : b.isMember ? 1 : 0;
+        return bp - ap;
+      });
+      container.innerHTML = sorted.map(groupCardHtml).join("");
+    } catch (err) {
+      container.innerHTML = `<div class="empty-state" style="color:var(--danger)">${esc(err.message)}</div>`;
+    }
+  }
+
+  // ── AI group suggestions ────────────────────────────────────────────────────
+  async function loadSuggestions() {
+    const btn = document.getElementById("btn-suggest");
+    const box = document.getElementById("suggestions");
+    btn.disabled = true;
+    const original = btn.innerHTML;
+    btn.innerHTML = "分析中...";
+    box.innerHTML = "";
+    try {
+      const r = await fetch("/api/groups/suggest", { method: "POST" });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "提案に失敗しました");
+
+      const suggestions = d.suggestions || [];
+      if (!suggestions.length) {
+        box.innerHTML = `<div class="suggest-section"><p class="suggest-sub">今おすすめできる新しいグループはありません。新しく作ってみましょう。</p></div>`;
+        return;
+      }
+      // Join suggestions with full group data from cache.
+      const cards = suggestions.map((s) => {
+        const g = groupsCache.find((x) => x.id === s.groupId);
+        if (!g) return "";
+        const tags = (g.tags || []).map((t) => `<span class="tag">${esc(t)}</span>`).join("");
+        const reason = s.reason ? `<div class="suggest-reason">${esc(s.reason)}</div>` : "";
+        return `<div class="suggest-card">
+          <div class="group-name">${esc(g.name)}</div>
+          <div class="group-meta">${g.memberCount}人のメンバー</div>
+          ${reason}
+          ${tags ? `<div class="group-tags">${tags}</div>` : ""}
+          <div class="group-actions">${actionFor(g)}</div>
+        </div>`;
+      }).join("");
+
+      box.innerHTML = `<div class="suggest-section">
+        <div class="suggest-heading">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--teal-600)" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M5 12H3M21 12h-2M6 6l1.5 1.5M18 18l-1.5-1.5M6 18l1.5-1.5M18 6l-1.5 1.5" stroke-linecap="round"/></svg>
+          あなたへのおすすめ
+        </div>
+        <p class="suggest-sub">${d.ai === false ? "タグの一致度から選びました" : "あなたの目標と状況をAIが読み取って選びました"}</p>
+        ${cards}
+      </div>
+      <div class="divider-label">すべてのグループ</div>`;
+    } catch (e) {
+      box.innerHTML = `<div class="suggest-section"><p class="suggest-sub" style="color:var(--danger)">${esc(e.message)}</p></div>`;
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = original;
+    }
+  }
+
+  // ── Group schedule ──────────────────────────────────────────────────────────
+  function nextDateForDay(ourDay) {
+    const today = new Date();
+    const targetJs = (ourDay + 1) % 7;
+    const diff = (targetJs - today.getDay() + 7) % 7;
+    const d = new Date(today);
+    d.setDate(today.getDate() + diff);
+    return d;
+  }
+
+  function dateLabel(ourDay) {
+    const DAYS = ["月","火","水","木","金","土","日"];
+    const d = nextDateForDay(ourDay);
+    return `${d.getMonth() + 1}/${d.getDate()}(${DAYS[ourDay]})`;
+  }
+
+  async function showGroupSchedule(groupId, btn) {
+    const panel = document.getElementById("sched-" + groupId);
+    if (panel.innerHTML) { panel.innerHTML = ""; btn.textContent = "全員の空き時間を確認"; return; }
+
+    btn.disabled = true;
+    btn.textContent = "取得中…";
+    try {
+      const r = await fetch(`/api/groups/${groupId}/availability`, { method: "POST" });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "エラー");
+
+      if (!d.hasData) {
+        panel.innerHTML = `<div class="group-schedule">
+          <div class="schedule-no-data">
+            カレンダーデータがまだありません。メンバーのうち${d.membersWithCalendar}人/${d.memberCount}人がカレンダーを連携済みです。
+            チャットからGoogleカレンダーを連携すると、全員の共通の空き時間が分かります。
+          </div>
+          <div class="schedule-privacy">${esc(d.privacyNote)}</div>
+        </div>`;
+      } else if (!d.windows.length) {
+        panel.innerHTML = `<div class="group-schedule">
+          <div class="schedule-no-data">共通の空き時間が見つかりませんでした。（${d.membersWithCalendar}/${d.memberCount}人のカレンダーを参照）</div>
+          <div class="schedule-privacy">${esc(d.privacyNote)}</div>
+        </div>`;
+      } else {
+        const chips = d.windows.map((w) =>
+          `<span class="schedule-chip">${dateLabel(w.day)} ${esc(w.start)}–${esc(w.end)}</span>`
+        ).join("");
+        const best = d.bestSlot ? `<div class="best-slot-row">
+          <span style="font-size:1.1rem">⭐</span>
+          <div>
+            <div class="best-slot-label">おすすめ（${d.membersWithCalendar}/${d.memberCount}人参照）</div>
+            <div class="best-slot-time">${dateLabel(d.bestSlot.day)} ${esc(d.bestSlot.start)}–${esc(d.bestSlot.end)}</div>
+          </div>
+        </div>` : "";
+        const aiNote = d.aiSuggestion
+          ? `<div class="schedule-ai-note">${esc(d.aiSuggestion)}</div>` : "";
+
+        panel.innerHTML = `<div class="group-schedule">
+          <div class="schedule-header">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18" stroke-linecap="round"/></svg>
+            メンバー全員の空き時間
+          </div>
+          ${best}
+          <div class="schedule-windows">${chips}</div>
+          ${aiNote}
+          <div class="schedule-privacy">${esc(d.privacyNote)}</div>
+        </div>`;
+      }
+      btn.textContent = "空き時間を閉じる";
+    } catch (e) {
+      panel.innerHTML = `<div class="group-schedule"><div class="schedule-no-data" style="color:var(--danger)">${esc(e.message)}</div></div>`;
+      btn.textContent = "全員の空き時間を確認";
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  (async () => {
+    try {
+      const r = await fetch("/api/me");
+      if (!r.ok) { location.href = "/"; return; }
+      const { user } = await r.json();
+      myId = user.id;
+      await loadGroups();
+    } catch { location.href = "/"; }
+  })();
+</script>
+</body>
+</html>

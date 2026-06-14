@@ -1,186 +1,82 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>StudyMatch — マッチング結果</title>
+  <title>peers — マッチング結果</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <script src="https://accounts.google.com/gsi/client" async></script>
+  <link rel="stylesheet" href="/peers.css" />
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: system-ui, -apple-system, sans-serif;
-      min-height: 100vh;
-      background: #f0f2ff;
-      padding: 1.5rem 1rem 3rem;
-    }
-    header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      max-width: 800px;
-      margin: 0 auto 2rem;
-    }
-    .logo-title { display: flex; align-items: center; gap: 0.5rem; }
-    .logo-title span { font-size: 1.5rem; }
-    .logo-title h1 { font-size: 1.25rem; color: #1a1a2e; }
-    .btn-sm {
-      padding: 0.4rem 0.9rem;
-      border-radius: 8px;
-      border: none;
-      font-size: 0.85rem;
-      cursor: pointer;
-      font-weight: 600;
-    }
-    .btn-logout { background: #f0f0f0; color: #666; }
-    .btn-logout:hover { background: #e0e0e0; }
-    .btn-chat-nav {
-      background: #667eea;
-      color: white;
-      position: relative;
-    }
-    .btn-chat-nav:hover { background: #5a6fd6; }
-    .pending-badge {
-      position: absolute;
-      top: -6px; right: -6px;
-      background: #e53e3e;
-      color: white;
-      font-size: 0.65rem;
-      font-weight: 700;
-      border-radius: 50%;
-      width: 18px; height: 18px;
-      display: flex; align-items: center; justify-content: center;
-    }
-
-    .container { max-width: 800px; margin: 0 auto; }
-
-    .compare-header {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
-      margin-bottom: 0.75rem;
-    }
-    .compare-label {
-      text-align: center;
-      padding: 0.5rem;
-      border-radius: 10px;
-      font-size: 0.85rem;
-      font-weight: 700;
-    }
-    .label-gemini { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
-    .label-tag { background: #e2e8f0; color: #555; }
-
-    .cards-pair {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
-      margin-bottom: 1rem;
-    }
-    .match-card {
-      background: white;
-      border-radius: 16px;
-      padding: 1.25rem;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.07);
-      position: relative;
-      display: flex;
-      flex-direction: column;
-    }
-    .match-card.gemini-card { border-top: 3px solid #667eea; }
-    .match-card.tag-card { border-top: 3px solid #a0aec0; }
-
+    /* match card internals */
+    .match-card { position: relative; }
     .rank-badge {
-      position: absolute;
-      top: -10px; left: 1rem;
-      font-size: 0.75rem;
-      font-weight: 700;
-      padding: 2px 10px;
-      border-radius: 20px;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 0.7rem; font-weight: 700; padding: 3px 10px;
+      border-radius: var(--r-pill); margin-bottom: 0.6rem;
     }
-    .gemini-card .rank-badge { background: #667eea; color: white; }
-    .tag-card .rank-badge { background: #a0aec0; color: white; }
-
-    .card-name { font-weight: 700; font-size: 1rem; color: #1a1a2e; margin-top: 0.5rem; margin-bottom: 0.25rem; }
-    .card-affiliation { font-size: 0.8rem; color: #888; margin-bottom: 0.75rem; }
-    .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 0.75rem; }
-    .tag { font-size: 0.72rem; padding: 2px 8px; border-radius: 20px; background: #eef0ff; color: #667eea; font-weight: 600; }
-    .score-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
-    .score-label { font-size: 0.75rem; color: #888; white-space: nowrap; }
-    .score-bar-wrap { flex: 1; height: 6px; background: #eee; border-radius: 3px; overflow: hidden; }
-    .score-bar { height: 100%; border-radius: 3px; transition: width 0.8s ease; }
-    .gemini-card .score-bar { background: linear-gradient(90deg, #667eea, #764ba2); }
-    .tag-card .score-bar { background: #a0aec0; }
-    .score-num { font-size: 0.75rem; font-weight: 700; color: #555; }
-
+    .badge-ai { background: var(--teal); color: #fff; }
+    .badge-tag { background: var(--teal-100); color: var(--teal-800); }
+    .card-name { font-family: var(--font-display); font-size: 1.15rem; font-weight: 700; color: var(--ink); margin-bottom: 0.2rem; }
+    .card-affiliation { font-size: 0.85rem; color: var(--muted); margin-bottom: 0.75rem; }
+    .score-row { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem; }
+    .score-label { font-size: 0.75rem; font-weight: 600; color: var(--muted); white-space: nowrap; }
+    .score-track { flex: 1; height: 6px; background: var(--teal-50); border-radius: 100px; overflow: hidden; }
+    .score-fill-ai { height: 100%; background: var(--teal); border-radius: 100px; transition: width 0.7s ease; }
+    .score-fill-tag { height: 100%; background: var(--teal-300); border-radius: 100px; transition: width 0.7s ease; }
+    .score-pct { font-size: 0.8rem; font-weight: 700; color: var(--teal-700); min-width: 32px; text-align: right; }
     .reason-box {
-      background: #f8f9ff;
-      border-radius: 8px;
-      padding: 0.6rem 0.75rem;
-      font-size: 0.82rem;
-      color: #444;
-      line-height: 1.55;
-      font-style: italic;
-      margin-bottom: 0.75rem;
-      flex: 1;
+      background: var(--teal-50); border: 1px solid var(--teal-100);
+      border-radius: var(--r-md); padding: 0.75rem 1rem;
+      font-size: 0.84rem; color: var(--teal-800); line-height: 1.6;
+      margin: 0.75rem 0;
     }
-    .tag-card .reason-box { background: #f7f7f7; color: #666; font-style: normal; }
+    .card-tags { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.875rem; }
+    .card-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .btn-connect {
+      padding: 0.55rem 1.05rem; background: var(--teal); color: #fff; border: none;
+      border-radius: var(--r-md); font-family: inherit; font-size: 0.84rem; font-weight: 600;
+      cursor: pointer; transition: background 0.15s, transform 0.15s;
+      box-shadow: 0 4px 14px rgba(93,200,205,0.3);
+    }
+    .btn-connect:hover { background: var(--teal-600); transform: translateY(-1px); }
+    .btn-message { padding: 0.55rem 1.05rem; background: var(--teal); color: #fff; border: none; border-radius: var(--r-md); font-family: inherit; font-size: 0.84rem; font-weight: 600; cursor: pointer; }
+    .btn-pending { padding: 0.55rem 1.05rem; background: var(--teal-50); color: var(--muted); border: none; border-radius: var(--r-md); font-family: inherit; font-size: 0.84rem; font-weight: 600; cursor: default; }
+    .btn-accept { padding: 0.55rem 1.05rem; background: var(--teal-700); color: #fff; border: none; border-radius: var(--r-md); font-family: inherit; font-size: 0.84rem; font-weight: 600; cursor: pointer; }
+    .btn-avail {
+      padding: 0.55rem 1.05rem; background: var(--surface); color: var(--ink);
+      border: 1.5px solid var(--line); border-radius: var(--r-md); font-family: inherit;
+      font-size: 0.84rem; font-weight: 600; cursor: pointer; transition: all 0.15s;
+    }
+    .btn-avail:hover { background: var(--teal-50); border-color: var(--teal-200); color: var(--teal-800); }
 
-    /* Connect button */
-    .connect-btn {
-      width: 100%;
-      padding: 0.55rem;
-      border-radius: 10px;
-      border: none;
-      font-size: 0.85rem;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.2s;
-      margin-top: auto;
-    }
-    .connect-btn.state-none { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
-    .connect-btn.state-none:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(102,126,234,0.4); }
-    .connect-btn.state-pending { background: #f0f0f0; color: #aaa; cursor: default; }
-    .connect-btn.state-accepted { background: #e8f5e9; color: #2e7d32; cursor: pointer; }
-    .connect-btn.state-accepted:hover { background: #c8e6c9; }
+    .avail-divider { height: 1px; background: var(--line); margin: 1rem 0; }
+    .avail-windows { list-style: none; display: flex; flex-direction: column; gap: 0.35rem; }
+    .avail-windows li { display: flex; gap: 0.75rem; font-size: 0.84rem; color: var(--ink-soft); }
+    .avail-day { font-weight: 700; color: var(--teal-700); min-width: 2.5rem; }
+    .avail-best { margin-top: 0.6rem; font-size: 0.84rem; font-weight: 600; color: var(--teal-800); background: var(--teal-50); border-radius: var(--r-sm); padding: 0.45rem 0.75rem; }
+    .avail-note { margin-top: 0.5rem; font-size: 0.72rem; color: var(--muted); line-height: 1.5; }
+    .avail-empty { font-size: 0.84rem; color: var(--muted); }
+
 
     .diff-insight {
-      background: linear-gradient(135deg, #667eea11, #764ba211);
-      border: 1px solid #667eea33;
-      border-radius: 12px;
-      padding: 1rem 1.25rem;
-      margin: 1.5rem 0;
-      font-size: 0.875rem;
-      color: #444;
-      line-height: 1.6;
+      background: var(--teal-50); border: 1px solid var(--teal-100);
+      border-radius: var(--r-lg); padding: 1rem 1.25rem; margin: 1.5rem 0;
+      font-size: 0.875rem; color: var(--teal-800); line-height: 1.65;
     }
-    .diff-insight strong { color: #667eea; }
-
-    .loading { text-align: center; padding: 4rem 0; color: #888; }
-    .spinner {
-      width: 48px; height: 48px;
-      border: 4px solid #e2e8f0;
-      border-top-color: #667eea;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin: 0 auto 1rem;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .diff-insight strong { color: var(--teal-700); }
 
     .error-box {
-      background: #fff5f5;
-      border: 1px solid #fed7d7;
-      border-radius: 12px;
-      padding: 1rem 1.25rem;
-      color: #e53e3e;
-      text-align: center;
-      margin: 2rem 0;
+      background: var(--danger-bg); border: 1px solid #f3c9c7;
+      border-radius: var(--r-md); padding: 1.5rem; text-align: center;
+      color: var(--danger); font-size: 0.9rem; line-height: 1.7;
     }
     .btn-retry {
-      margin-top: 0.75rem;
-      padding: 0.6rem 1.5rem;
-      background: #667eea;
-      color: white;
-      border-radius: 10px;
-      border: none;
-      font-weight: 600;
-      cursor: pointer;
+      margin-top: 0.75rem; padding: 0.6rem 1.25rem; background: var(--teal); color: #fff;
+      border: none; border-radius: var(--r-md); font-family: inherit; font-weight: 600;
+      font-size: 0.85rem; cursor: pointer;
     }
 
     @media (max-width: 520px) {
@@ -189,274 +85,317 @@
   </style>
 </head>
 <body>
-  <header>
-    <div class="logo-title">
-      <span>📚</span>
-      <h1>StudyMatch</h1>
-    </div>
-    <div style="display:flex;gap:8px;align-items:center">
-      <button class="btn-sm btn-chat-nav" id="btn-chat" onclick="location.href='/chat.html'" style="position:relative">
-        💬 チャット
-        <span class="pending-badge" id="pending-badge" style="display:none">0</span>
-      </button>
-      <button class="btn-sm btn-logout" onclick="goProfile()">プロフィール編集</button>
-      <button class="btn-sm btn-logout" onclick="logout()">ログアウト</button>
-    </div>
-  </header>
 
-  <div class="container">
-    <div id="content">
-      <div class="loading">
-        <div class="spinner"></div>
-        <p>Gemini AIがあなたに合う仲間を探しています…</p>
-      </div>
+<header>
+  <div class="header-inner">
+    <a class="logo" href="/match.html">
+      <svg class="brand-mark" width="26" height="26" viewBox="0 0 120 120" aria-hidden="true"><rect width="120" height="120" rx="26" fill="#5dc8cd"/><g transform="translate(60,62) rotate(-18)"><path d="M 0,-26 C -10,-32 -25,-32 -35,-27 L -35,24 C -25,18 -10,18 0,25 C 10,18 25,18 35,24 L 35,-27 C 25,-32 10,-32 0,-26 Z" fill="#fff"/><path d="M 0,-26 L 0,25" stroke="#5dc8cd" stroke-width="3" stroke-linecap="round"/></g></svg>
+      peers
+    </a>
+    <nav>
+      <button class="nav-btn" id="btn-cal" onclick="connectCalendar()">カレンダー連携</button>
+      <button class="nav-btn" onclick="location.href='/groups.html'">グループ</button>
+      <button class="nav-btn nav-btn-chat" onclick="location.href='/chat.html'">
+        チャット<span class="pending-count" id="pending-count" hidden></span>
+      </button>
+      <button class="nav-btn" onclick="goProfile()">プロフィール編集</button>
+      <button class="nav-btn" onclick="logout()">ログアウト</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">あなたへのマッチ</h1>
+      <p class="page-subtitle">AIが相性を分析してランキングしました</p>
     </div>
   </div>
+  <div id="content">
+    <div class="loading">
+      <div class="spinner"></div>
+      <p class="loading-text">Gemini AIがあなたに合う仲間を探しています…</p>
+    </div>
+  </div>
+</main>
 
-  <script>
-    // connStatus: userId -> 'none' | 'pending_sent' | 'pending_received' | 'accepted'
-    let connStatus = {};
+<script>
+  const CLIENT_ID = "1046552519693-3n1mf8quucql9e2k2pj6ugsm04rgmldq.apps.googleusercontent.com";
+  let calTokenClient = null;
+  let connStatus = {};
 
-    async function logout() {
-      await fetch("/api/auth/logout", { method: "POST" });
+  // ── Calendar ──────────────────────────────────────────────────────────
+  function initCal() {
+    if (!window.google?.accounts?.oauth2) { setTimeout(initCal, 300); return; }
+    calTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: "https://www.googleapis.com/auth/calendar.freebusy",
+      callback: async (resp) => {
+        if (resp.error) { alert("カレンダー連携に失敗しました: " + resp.error); return; }
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        try {
+          const r = await fetch("/api/calendar/connect", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ accessToken: resp.access_token, timeZone: tz }),
+          });
+          const d = await r.json();
+          if (r.ok) {
+            document.getElementById("btn-cal").textContent = `カレンダー連携済 (${d.blockCount})`;
+          } else {
+            alert("Error: " + (d.error || "Unknown error"));
+          }
+        } catch (e) {
+          alert("Network error: " + e.message);
+        }
+      },
+    });
+  }
+
+  function connectCalendar() {
+    if (!calTokenClient) { alert("しばらく待ってから再試行してください。"); return; }
+    calTokenClient.requestAccessToken();
+  }
+
+  window.addEventListener("load", initCal);
+
+  // ── Auth ──────────────────────────────────────────────────────────────
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    location.href = "/";
+  }
+  function goProfile() { location.href = "/profile-edit.html"; }
+
+  // ── Calendar (Japanese messages) ──────────────────────────────────────
+
+  function esc(str) {
+    return String(str ?? "")
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  // ── Pending badge ─────────────────────────────────────────────────────
+  async function loadPendingBadge() {
+    try {
+      const r = await fetch("/api/connections/pending");
+      if (!r.ok) return;
+      const { pending } = await r.json();
+      const el = document.getElementById("pending-count");
+      if (pending.length > 0) { el.textContent = pending.length; el.hidden = false; }
+      else { el.hidden = true; }
+    } catch {}
+  }
+
+  // ── Connection statuses ───────────────────────────────────────────────
+  async function loadConnectionStatuses(ids) {
+    try {
+      const [connRes, pendingRes] = await Promise.all([
+        fetch("/api/connections"),
+        fetch("/api/connections/pending"),
+      ]);
+      const { connections } = await connRes.json();
+      const { pending } = await pendingRes.json();
+
+      for (const id of ids) connStatus[id] = "none";
+      for (const c of connections) connStatus[c.partnerId] = "accepted";
+      for (const p of pending) connStatus[p.fromId] = "pending_received";
+
+      const sentChecks = await Promise.all(
+        ids.filter((id) => connStatus[id] === "none").map(async (id) => {
+          const r = await fetch(`/api/connections/status/${id}`);
+          const d = await r.json();
+          return { id, status: d.status };
+        })
+      );
+      for (const { id, status } of sentChecks) {
+        if (connStatus[id] === "none") connStatus[id] = status;
+      }
+    } catch {}
+  }
+
+  function btnLabel(status) {
+    if (status === "accepted") return "メッセージ";
+    if (status === "pending_sent") return "申請中…";
+    if (status === "pending_received") return "承認する";
+    return "つながる";
+  }
+  function btnClass(status) {
+    if (status === "accepted") return "btn-message";
+    if (status === "pending_sent") return "btn-pending";
+    if (status === "pending_received") return "btn-accept";
+    return "btn-connect";
+  }
+  function connectBtnHtml(userId) {
+    const s = connStatus[userId] || "none";
+    const disabled = s === "pending_sent" ? "disabled" : "";
+    return `<button class="${btnClass(s)}" data-target="${esc(userId)}"
+      onclick="handleConnect('${esc(userId)}', this)" ${disabled}>${btnLabel(s)}</button>`;
+  }
+
+  async function handleConnect(targetId, btnEl) {
+    const status = connStatus[targetId] || "none";
+    if (status === "accepted") { location.href = `/chat.html?with=${targetId}`; return; }
+    if (status === "pending_sent") return;
+    if (status === "pending_received") {
+      const r = await fetch(`/api/connect/${targetId}/accept`, { method: "PUT" });
+      if (r.ok) { connStatus[targetId] = "accepted"; updateAllButtons(targetId); }
+      return;
+    }
+    btnEl.disabled = true;
+    const r = await fetch(`/api/connect/${targetId}`, { method: "POST" });
+    if (r.ok) {
+      const { conn } = await r.json();
+      connStatus[targetId] = conn.status === "accepted" ? "accepted" : "pending_sent";
+      updateAllButtons(targetId);
+    } else { btnEl.disabled = false; }
+  }
+
+  function updateAllButtons(targetId) {
+    document.querySelectorAll(`[data-target="${CSS.escape(targetId)}"]`).forEach((btn) => {
+      const s = connStatus[targetId] || "none";
+      btn.textContent = btnLabel(s);
+      btn.className = btnClass(s);
+      btn.disabled = false;
+    });
+  }
+
+  // ── Availability ──────────────────────────────────────────────────────
+  async function showAvailability(targetId, btn) {
+    const box = document.getElementById("avail-" + targetId);
+    btn.disabled = true;
+    btn.textContent = "取得中…";
+    try {
+      const r = await fetch("/api/availability", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetId }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Error");
+
+      if (!d.windows?.length) {
+        box.innerHTML = `<div class="avail-divider"></div>
+          <p class="avail-empty">共通の空き時間が見つかりませんでした。カレンダーを連携するとより正確になります。</p>`;
+      } else {
+        const lines = [...d.windows]
+          .sort((a, b) => a.day - b.day || a.start.localeCompare(b.start))
+          .map((w) => {
+            const span = w.start === "06:00" && w.end === "24:00"
+              ? "All day" : `${w.start} – ${w.end}`;
+            return `<li><span class="avail-day">${esc(w.dayLabel)}</span><span>${esc(span)}</span></li>`;
+          }).join("");
+        const best = d.bestSlot
+          ? `<div class="avail-best">おすすめ — ${esc(d.bestSlot.dayLabel)} ${esc(d.bestSlot.start)}〜${esc(d.bestSlot.end)}</div>` : "";
+        box.innerHTML = `<div class="avail-divider"></div>
+          <ul class="avail-windows">${lines}</ul>
+          ${best}
+          <p class="avail-note">${esc(d.privacyNote)}</p>`;
+      }
+      btn.style.display = "none";
+    } catch (e) {
+      box.innerHTML = `<div class="avail-divider"></div><p class="avail-empty">${esc(e.message)}</p>`;
+      btn.disabled = false;
+      btn.textContent = "空き時間を確認";
+    }
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────
+  async function renderMatches(data) {
+    const geminiMatches = data.geminiMatches ?? [];
+    const tagMatches = data.tagMatches ?? [];
+    const container = document.getElementById("content");
+
+    if (!geminiMatches.length) {
+      container.innerHTML = '<div class="empty-state">マッチングが見つかりませんでした。プロフィールを完成させてください。</div>';
+      return;
+    }
+
+    const allIds = [...new Set([
+      ...geminiMatches.map((m) => m.id),
+      ...tagMatches.map((m) => m.id),
+    ])];
+    await loadConnectionStatuses(allIds);
+
+    const tagTopId = tagMatches[0]?.id;
+    const geminiTopId = geminiMatches[0]?.id;
+    const hasDiff = tagTopId && geminiTopId && tagTopId !== geminiTopId;
+
+    let html = "";
+
+    for (let i = 0; i < geminiMatches.length; i++) {
+      const g = geminiMatches[i];
+      html += `<div class="match-card">
+        <span class="rank-badge badge-ai">#${i + 1}</span>
+        <div class="card-name">${esc(g.nickname)}</div>
+        <div class="score-row">
+          <span class="score-label">AI相性</span>
+          <div class="score-track"><div class="score-fill-ai" style="width:${g.geminiScore ?? 0}%"></div></div>
+          <span class="score-pct">${g.geminiScore ?? "-"}%</span>
+        </div>
+        <div class="score-row">
+          <span class="score-label">タグ一致</span>
+          <div class="score-track"><div class="score-fill-tag" style="width:${g.tagScore ?? 0}%"></div></div>
+          <span class="score-pct">${g.tagScore ?? 0}%</span>
+        </div>
+        ${g.reason ? `<div class="reason-box">"${esc(g.reason)}"</div>` : ""}
+        <div class="card-tags">${(g.studyFields || []).slice(0, 6).map((f) => `<span class="tag">${esc(f)}</span>`).join("")}</div>
+        <div class="card-actions">
+          ${connectBtnHtml(g.id)}
+          <button class="btn-avail" onclick="showAvailability('${esc(g.id)}', this)">空き時間を確認</button>
+        </div>
+        <div id="avail-${esc(g.id)}"></div>
+      </div>`;
+    }
+
+    if (hasDiff) {
+      const tagTopName = tagMatches[0]?.nickname;
+      const geminiTopName = geminiMatches[0]?.nickname;
+      html += `<div class="diff-insight">
+        <strong>Geminiが読んだ深い相性</strong><br>
+        タグだけで見ると <strong>${esc(tagTopName)}</strong> が上位ですが、
+        Geminiは文章から勉強スタイルや感情的なニーズを読み取り
+        <strong>${esc(geminiTopName)}</strong> を1位に選びました。
+        タグが同じでも、文章でしか伝わらない相性があります。
+      </div>`;
+    }
+
+    container.innerHTML = html;
+  }
+
+  async function loadMatches() {
+    const container = document.getElementById("content");
+    try {
+      const r = await fetch("/api/match", { method: "POST" });
+      const data = await r.json();
+      if (!r.ok) {
+        if (r.status === 400 && data.error?.includes("プロフィール")) {
+          container.innerHTML = `<div class="error-box">
+            プロフィールを完成させてからマッチングできます。
+            <br><button class="btn-retry" onclick="location.href='/onboarding.html'">プロフィールを設定する</button>
+          </div>`;
+        } else {
+          throw new Error(data.error || "An error occurred");
+        }
+        return;
+      }
+      await renderMatches(data);
+    } catch (err) {
+      container.innerHTML = `<div class="error-box">
+        ${esc(err.message)}
+        <br><button class="btn-retry" onclick="loadMatches()">再試行</button>
+      </div>`;
+    }
+  }
+
+  (async () => {
+    try {
+      const r = await fetch("/api/me");
+      if (!r.ok) { location.href = "/"; return; }
+      await Promise.all([loadMatches(), loadPendingBadge()]);
+    } catch {
       location.href = "/";
     }
-
-    function goProfile() { location.href = "/profile-edit.html"; }
-
-    function esc(str) {
-      return String(str ?? "")
-        .replace(/&/g, "&amp;").replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-    }
-
-    async function loadPendingBadge() {
-      try {
-        const r = await fetch("/api/connections/pending");
-        if (!r.ok) return;
-        const { pending } = await r.json();
-        const badge = document.getElementById("pending-badge");
-        if (pending.length > 0) {
-          badge.textContent = pending.length;
-          badge.style.display = "flex";
-        } else {
-          badge.style.display = "none";
-        }
-      } catch {}
-    }
-
-    async function loadConnectionStatuses(ids) {
-      try {
-        const [connRes, pendingRes] = await Promise.all([
-          fetch("/api/connections"),
-          fetch("/api/connections/pending"),
-        ]);
-        const { connections } = await connRes.json();
-        const { pending } = await pendingRes.json();
-
-        for (const id of ids) connStatus[id] = "none";
-        for (const c of connections) connStatus[c.partnerId] = "accepted";
-        for (const p of pending) connStatus[p.fromId] = "pending_received";
-
-        // Check sent (pending_sent) via individual status if needed
-        const sentRes = await Promise.all(
-          ids.filter((id) => connStatus[id] === "none").map(async (id) => {
-            const r = await fetch(`/api/connections/status/${id}`);
-            const d = await r.json();
-            return { id, status: d.status };
-          })
-        );
-        for (const { id, status } of sentRes) {
-          if (connStatus[id] === "none") connStatus[id] = status;
-        }
-      } catch {}
-    }
-
-    function btnLabel(status) {
-      if (status === "accepted") return "💬 チャットする";
-      if (status === "pending_sent") return "申請中…";
-      if (status === "pending_received") return "✅ 承認する";
-      return "✋ つながる";
-    }
-
-    function btnClass(status) {
-      if (status === "accepted") return "state-accepted";
-      if (status === "pending_sent") return "state-pending";
-      return "state-none";
-    }
-
-    async function handleConnect(targetId, btnEl) {
-      const status = connStatus[targetId] || "none";
-      if (status === "accepted") {
-        location.href = `/chat.html?with=${targetId}`;
-        return;
-      }
-      if (status === "pending_sent") return;
-      if (status === "pending_received") {
-        // accept
-        const r = await fetch(`/api/connect/${targetId}/accept`, { method: "PUT" });
-        if (r.ok) {
-          connStatus[targetId] = "accepted";
-          updateAllButtons(targetId);
-        }
-        return;
-      }
-      // send request
-      btnEl.disabled = true;
-      const r = await fetch(`/api/connect/${targetId}`, { method: "POST" });
-      if (r.ok) {
-        const { conn } = await r.json();
-        connStatus[targetId] = conn.status === "accepted" ? "accepted" : "pending_sent";
-        updateAllButtons(targetId);
-      } else {
-        btnEl.disabled = false;
-      }
-    }
-
-    function updateAllButtons(targetId) {
-      document.querySelectorAll(`[data-target="${targetId}"]`).forEach((btn) => {
-        const s = connStatus[targetId] || "none";
-        btn.textContent = btnLabel(s);
-        btn.className = `connect-btn ${btnClass(s)}`;
-        btn.disabled = false;
-      });
-    }
-
-    function connectBtnHtml(userId) {
-      const s = connStatus[userId] || "none";
-      return `<button class="connect-btn ${btnClass(s)}" data-target="${userId}"
-        onclick="handleConnect('${userId}', this)">${btnLabel(s)}</button>`;
-    }
-
-    async function renderMatches(data) {
-      const { geminiMatches, tagMatches } = data;
-      const container = document.getElementById("content");
-
-      if (!geminiMatches.length && !tagMatches.length) {
-        container.innerHTML = '<div class="error-box">マッチング候補が見つかりませんでした。</div>';
-        return;
-      }
-
-      // Fetch connection statuses for all displayed users
-      const allIds = [...new Set([
-        ...geminiMatches.map((m) => m.id),
-        ...tagMatches.map((m) => m.id),
-      ])];
-      await loadConnectionStatuses(allIds);
-
-      const diffNames = geminiMatches.map((m) => m.nickname).join("、");
-      const tagNames = tagMatches.map((m) => m.nickname).join("、");
-      const hasDiff = diffNames !== tagNames;
-
-      let html = `<div class="compare-header">
-        <div class="compare-label label-gemini">🤖 Gemini AIマッチ</div>
-        <div class="compare-label label-tag">🏷️ タグだけのマッチ</div>
-      </div>`;
-
-      const maxRows = Math.max(geminiMatches.length, tagMatches.length);
-      for (let i = 0; i < maxRows; i++) {
-        const g = geminiMatches[i];
-        const t = tagMatches[i];
-        html += `<div class="cards-pair">`;
-
-        if (g) {
-          html += `<div class="match-card gemini-card">
-            <span class="rank-badge">#${i + 1} Gemini</span>
-            <div class="card-name">${esc(g.nickname)}</div>
-            <div class="card-affiliation">${esc(g.affiliation)}</div>
-            <div class="tags">${(g.studyFields || []).slice(0, 4).map((f) => `<span class="tag">${esc(f)}</span>`).join("")}</div>
-            <div class="score-row">
-              <span class="score-label">AI相性</span>
-              <div class="score-bar-wrap"><div class="score-bar" style="width:${g.geminiScore ?? 0}%"></div></div>
-              <span class="score-num">${g.geminiScore ?? "-"}%</span>
-            </div>
-            <div class="score-row">
-              <span class="score-label">タグ一致</span>
-              <div class="score-bar-wrap"><div class="score-bar" style="width:${g.tagScore ?? 0}%"></div></div>
-              <span class="score-num">${g.tagScore ?? 0}%</span>
-            </div>
-            <div class="reason-box">「${esc(g.reason || "")}」</div>
-            ${connectBtnHtml(g.id)}
-          </div>`;
-        } else {
-          html += `<div></div>`;
-        }
-
-        if (t) {
-          html += `<div class="match-card tag-card">
-            <span class="rank-badge">#${i + 1} タグ</span>
-            <div class="card-name">${esc(t.nickname)}</div>
-            <div class="card-affiliation">${esc(t.affiliation)}</div>
-            <div class="tags">${(t.studyFields || []).slice(0, 4).map((f) => `<span class="tag">${esc(f)}</span>`).join("")}</div>
-            <div class="score-row">
-              <span class="score-label">タグ一致</span>
-              <div class="score-bar-wrap"><div class="score-bar" style="width:${t.tagScore ?? 0}%"></div></div>
-              <span class="score-num">${t.tagScore ?? 0}%</span>
-            </div>
-            <div class="reason-box" style="font-style:normal;color:#888">
-              共通タグ: ${(t.studyFields || []).join(", ") || "なし"}
-            </div>
-            ${connectBtnHtml(t.id)}
-          </div>`;
-        } else {
-          html += `<div></div>`;
-        }
-
-        html += `</div>`;
-      }
-
-      if (hasDiff) {
-        html += `<div class="diff-insight">
-          <strong>💡 タグでは読めないものをGeminiが読みました</strong><br>
-          タグマッチの上位は <strong>${esc(tagNames)}</strong> でしたが、
-          Geminiは勉強スタイルや感情的なニーズを読み取り
-          <strong>${esc(diffNames)}</strong> を選びました。
-          同じタグでも、目標への本気度や孤独感・仲間への期待値など、
-          文章でしか伝わらない相性があります。
-        </div>`;
-      } else {
-        html += `<div class="diff-insight">
-          タグマッチとGeminiマッチが一致しました。分野の一致度が高く、かつ文章からも深い相性が確認されています。
-        </div>`;
-      }
-
-      container.innerHTML = html;
-    }
-
-    async function loadMatches() {
-      const container = document.getElementById("content");
-      try {
-        const r = await fetch("/api/match", { method: "POST" });
-        const data = await r.json();
-        if (!r.ok) {
-          if (r.status === 400 && data.error?.includes("プロフィール")) {
-            container.innerHTML = `<div class="error-box">
-              プロフィールを完成させてからマッチングできます。
-              <br><button class="btn-retry" onclick="location.href='/onboarding.html'">プロフィールを設定する</button>
-            </div>`;
-          } else {
-            throw new Error(data.error || "エラーが発生しました");
-          }
-          return;
-        }
-        await renderMatches(data);
-      } catch (err) {
-        container.innerHTML = `<div class="error-box">
-          ${esc(err.message)}
-          <br><button class="btn-retry" onclick="loadMatches()">再試行</button>
-        </div>`;
-      }
-    }
-
-    (async () => {
-      try {
-        const r = await fetch("/api/me");
-        if (!r.ok) { location.href = "/"; return; }
-        await Promise.all([loadMatches(), loadPendingBadge()]);
-      } catch {
-        location.href = "/";
-      }
-    })();
-  </script>
+  })();
+</script>
 </body>
 </html>

@@ -1,31 +1,56 @@
 // In-memory user store. Replace with Postgres/Mongo for production.
 
-import { DUMMY_SCHEDULES } from "./dummy_schedules.js";
-
 const users = new Map(); // id -> user
 const bySub = new Map(); // google_sub -> id
-let nextId = 100; // start at 100; dummy users use ids 1-12
+let nextId = 100;
 
 // ---------- helpers ----------------------------------------------------------
 
 function emptyProfile() {
   return {
     nickname: null,
-    gender: null,
-    birthYear: null,
-    affiliation: null,
     studyFields: [],
-    currentLevel: null,
     goal: null,
+    publicBio: null,
+    privateReality: null,
+    privateAffiliation: null,
     country: "日本",
-    bio: null,
-    busyBlocks: [],
-    calendarConnected: false,
     profileComplete: false,
+    embedding: null,
   };
 }
 
-// ---------- dummy users (P1) -------------------------------------------------
+export function cosineSimilarity(vecA, vecB) {
+  if (!vecA?.length || !vecB?.length || vecA.length !== vecB.length) return 0;
+  let dot = 0, magA = 0, magB = 0;
+  for (let i = 0; i < vecA.length; i++) {
+    dot += vecA[i] * vecB[i];
+    magA += vecA[i] * vecA[i];
+    magB += vecB[i] * vecB[i];
+  }
+  const denom = Math.sqrt(magA) * Math.sqrt(magB);
+  return denom === 0 ? 0 : dot / denom;
+}
+
+export async function initDummyEmbeddings(embedFn) {
+  for (const u of users.values()) {
+    if (u.profile?.profileComplete && !u.profile.embedding) {
+      const text = [
+        u.profile.privateAffiliation,
+        (u.profile.studyFields || []).join(", "),
+        u.profile.goal,
+        u.profile.publicBio,
+        u.profile.privateReality,
+      ].filter(Boolean).join(" ");
+      if (text) {
+        const embedding = await embedFn(text);
+        if (embedding) u.profile.embedding = embedding;
+      }
+    }
+  }
+}
+
+// ---------- dummy users ------------------------------------------------------
 
 const DUMMY_USERS = [
   {
@@ -37,15 +62,14 @@ const DUMMY_USERS = [
     createdAt: Date.now(),
     profile: {
       nickname: "はな",
-      gender: "female",
-      birthYear: 2004,
-      affiliation: "浪人生",
       studyFields: ["大学受験", "英語", "数学"],
-      currentLevel: "共通テスト600点台。英語が得意で数学が苦手。",
-      goal: "来年3月までに早稲田大学法学部に現役合格する",
+      goal: "来年3月までに早稲田大学法学部に合格する",
+      publicBio: "早稲田大学法学部への合格を目指して、毎朝6時から夜11時まで全力で学んでいます。同じ目標に向かって支え合える仲間を探しています。",
+      privateReality: "共通テスト600点台で英語は得意だが数学が苦手。去年は本番でパニックになり失敗した経験がある。浪人中で周りに同じ境遇の友達がおらず孤独を感じている。",
+      privateAffiliation: "浪人生",
       country: "日本",
-      bio: "去年は緊張のあまり本番でパニックになって失敗してしまいました。今年は絶対リベンジしたいけど、周りに浪人してる友達がいなくて孤独を感じています。一緒に頑張れる仲間が欲しいです。毎朝6時に起きて夜11時まで勉強するストイックなタイプです。",
       profileComplete: true,
+      embedding: null,
     },
   },
   {
@@ -57,15 +81,14 @@ const DUMMY_USERS = [
     createdAt: Date.now(),
     profile: {
       nickname: "けんじ",
-      gender: "male",
-      birthYear: 2003,
-      affiliation: "浪人生",
       studyFields: ["大学受験", "数学", "物理", "化学"],
-      currentLevel: "数学は得意（模試偏差値68）。物理と化学を底上げ中。",
-      goal: "東京大学理科一類に合格したい",
+      goal: "東京大学理科一類に合格する",
+      publicBio: "東大合格という夢に向かって、理系科目を武器に突き進んでいます。誰かと励まし合いながらこの挑戦を乗り越えたいと思っています。",
+      privateReality: "2浪目。数学は模試偏差値68と得意だが物理と化学を底上げ中。1浪目に精神的につらい時期があった。追い込み時期の焦りのコントロールが課題。夜型で23時〜深夜2時が集中できる。",
+      privateAffiliation: "浪人生（2浪）",
       country: "日本",
-      bio: "東大を目指して2浪目です。1浪目は独りで抱え込んで精神的にしんどくなりました。今年は誰かと励ましあいながら進めたい。理系科目は得意だけど追い込み時期の焦りをコントロールするのが課題。夜型で23時〜深夜2時が最も集中できます。",
       profileComplete: true,
+      embedding: null,
     },
   },
   {
@@ -77,15 +100,14 @@ const DUMMY_USERS = [
     createdAt: Date.now(),
     profile: {
       nickname: "さくら",
-      gender: "female",
-      birthYear: 1998,
-      affiliation: "社会人（会社員）",
       studyFields: ["TOEIC", "英会話", "英語"],
-      currentLevel: "TOEIC 595点。リスニングは650相当だがリーディングが570。",
-      goal: "半年以内にTOEIC 800点を取って海外部門に異動したい",
+      goal: "半年以内にTOEIC 800点を取って海外部門に異動する",
+      publicBio: "海外部門への異動という夢を叶えるために、忙しい日々の合間を縫ってTOEICに挑んでいます。同じように忙しくても英語を諦めない仲間と出会いたいです。",
+      privateReality: "TOEIC 595点（リスニング650相当、リーディング570）。メーカー営業で毎日残業があり勉強時間の確保が難しい。朝の通勤電車30分が唯一の勉強タイム。",
+      privateAffiliation: "社会人（会社員・メーカー営業）",
       country: "日本",
-      bio: "メーカーで営業をしています。英語が話せれば仕事の幅が広がると確信しているのに、毎日残業で勉強時間が確保できないのが悩みです。同じように忙しい中で英語を頑張っている人と繋がって、お互いに背中を押し合いたいです。朝の通勤電車30分が唯一の勉強タイム。",
       profileComplete: true,
+      embedding: null,
     },
   },
   {
@@ -97,15 +119,14 @@ const DUMMY_USERS = [
     createdAt: Date.now(),
     profile: {
       nickname: "たろう",
-      gender: "male",
-      birthYear: 1995,
-      affiliation: "社会人（フリーランス・経営者）",
       studyFields: ["プログラミング", "Python", "データ分析", "機械学習"],
-      currentLevel: "HTML/CSSは習得済。PythonはAtCoderでbrown。",
       goal: "1年以内にデータサイエンティストとして転職する",
+      publicBio: "データサイエンティストへの転身という大きな挑戦に踏み出しました。週末は8時間以上学習に充てています。刺激し合えるエンジニア仲間と出会いたいです。",
+      privateReality: "Webデザイナーとして5年のキャリア後、データ分析に転身を決意。HTML/CSS習得済みでPythonはAtCoder brown。独学で方向性が正しいか不安を感じることが多い。",
+      privateAffiliation: "社会人（フリーランス・Webデザイナー）",
       country: "日本",
-      bio: "Webデザイナーとして5年間働いてきたが、データの世界に魅力を感じて転身を決意しました。独学でやってきたけど、一人だと方向性が正しいか不安になることが多い。同じように転職を目指している人や、すでにエンジニアの人と繋がって刺激を受けたい。週末は8時間以上勉強できます。",
       profileComplete: true,
+      embedding: null,
     },
   },
   {
@@ -117,15 +138,14 @@ const DUMMY_USERS = [
     createdAt: Date.now(),
     profile: {
       nickname: "ゆき",
-      gender: "female",
-      birthYear: 2001,
-      affiliation: "大学生・大学院生",
       studyFields: ["韓国語", "語学", "K-POP"],
-      currentLevel: "ハングル検定4級。日常会話は少しできる。",
       goal: "1年後に韓国語能力試験（TOPIK）3級を取得する",
+      publicBio: "韓国のドラマや音楽を字幕なしで楽しめることを夢見て、TOPIK 3級合格を目指しています。週に1〜2回一緒にオンライン会話練習できる仲間を探しています。",
+      privateReality: "ハングル検定4級で日常会話が少しできる程度。大学のサークルに韓国語仲間がおらず、一人での勉強でモチベーションが続きにくい。",
+      privateAffiliation: "大学生",
       country: "日本",
-      bio: "韓国のドラマと音楽が好きで、字幕なしで楽しめるようになりたいと思い勉強を始めました。大学のサークルには韓国語仲間がいなくて、一人でやってるとモチベが続かないです。同じ目標を持つ人と週に1〜2回オンラインで会話練習できたら最高です。",
       profileComplete: true,
+      embedding: null,
     },
   },
   {
@@ -137,15 +157,14 @@ const DUMMY_USERS = [
     createdAt: Date.now(),
     profile: {
       nickname: "りょう",
-      gender: "male",
-      birthYear: 1993,
-      affiliation: "社会人（会社員）",
       studyFields: ["公認会計士", "簿記", "資格・検定"],
-      currentLevel: "簿記2級取得済。公認会計士の短答式に向けて勉強中。",
       goal: "2年以内に公認会計士試験に合格する",
+      publicBio: "公認会計士という夢に向かって、毎朝4時半に起きて学習する日々を続けています。同じ難関資格に挑む仲間と定期的に進捗を報告し合いたいです。",
+      privateReality: "簿記2級取得済みで短答式に向けて勉強中。合格率の低さから何度も諦めかけた経験がある。銀行員として働きながら時間確保が課題。",
+      privateAffiliation: "社会人（会社員・銀行員）",
       country: "日本",
-      bio: "銀行員として働きながら公認会計士を目指しています。合格率が低くて、やめようかと何度も思いましたが、ここまで来たら絶対にやり遂げたいです。朝4時半に起きて出勤前に勉強するのが習慣です。同じ難関資格に挑んでいる人と定期的に進捗を報告し合う関係が欲しいです。",
       profileComplete: true,
+      embedding: null,
     },
   },
   {
@@ -157,15 +176,14 @@ const DUMMY_USERS = [
     createdAt: Date.now(),
     profile: {
       nickname: "みか",
-      gender: "female",
-      birthYear: 2000,
-      affiliation: "大学生・大学院生",
       studyFields: ["大学院受験", "英語", "TOEFL", "心理学"],
-      currentLevel: "TOEFL 78点。心理学の専門知識はある程度あり。",
       goal: "来年9月にアメリカの大学院（心理学）に進学する",
+      publicBio: "アメリカの大学院で心理学を研究するという夢を実現するため、TOEFLと専門知識を磨いています。海外進学という共通の夢を語り合える仲間を探しています。",
+      privateReality: "TOEFL 78点でスピーキングがネック。一人での練習に限界を感じている。心理学の専門知識はある程度身についている。",
+      privateAffiliation: "大学生（心理学専攻）",
       country: "日本",
-      bio: "日本の大学で心理学を学んでいます。ずっと海外で研究がしたくて、来年アメリカの大学院を受験します。TOEFLのスピーキングがネックで、一人で練習するのに限界を感じています。英語も勉強も頑張っている人と繋がって、海外進学という共通の夢を語り合いたいです。",
       profileComplete: true,
+      embedding: null,
     },
   },
   {
@@ -177,15 +195,14 @@ const DUMMY_USERS = [
     createdAt: Date.now(),
     profile: {
       nickname: "しょう",
-      gender: "male",
-      birthYear: 1990,
-      affiliation: "社会人（会社員）",
       studyFields: ["プログラミング", "JavaScript", "React", "Web開発"],
-      currentLevel: "JavaScriptは業務で使用。Reactは独学6ヶ月。",
       goal: "フリーランスのWebエンジニアとして独立する",
+      publicBio: "自分でサービスを作れるエンジニアになるという夢に向かって、隙間時間を最大限活用して学習しています。週1回でも進捗を共有できる仲間を探しています。",
+      privateReality: "ITディレクターとして勤務中。JavaScriptは業務使用だがReactは独学6ヶ月。会社が忙しく学習時間の確保が難しい。",
+      privateAffiliation: "社会人（会社員・ITディレクター）",
       country: "日本",
-      bio: "IT系の会社でディレクターをしていますが、技術力をもっと身につけて自分でサービスを作れるようになりたいです。会社の仕事は忙しいので隙間時間を効率よく使うことを意識しています。同じくエンジニアリングを学んでいる人と、週1回でも進捗を共有できる関係が欲しいです。",
       profileComplete: true,
+      embedding: null,
     },
   },
   {
@@ -197,15 +214,14 @@ const DUMMY_USERS = [
     createdAt: Date.now(),
     profile: {
       nickname: "なな",
-      gender: "female",
-      birthYear: 2005,
-      affiliation: "高校生",
       studyFields: ["大学受験", "英語", "国語", "日本史"],
-      currentLevel: "文系。英語は得意（英検2級）。国語と日本史を強化中。",
       goal: "慶應義塾大学文学部に現役合格する",
+      publicBio: "慶應義塾大学文学部への現役合格を目指して、文系科目を深く掘り下げて学んでいます。一緒に志望校を目指せる仲間と出会いたいです。",
+      privateReality: "英語は英検2級で得意だが国語と日本史を強化中。周りは理系志望が多く文系の話ができる人がおらず孤独を感じている。",
+      privateAffiliation: "高校生（高3）",
       country: "日本",
-      bio: "高3で受験勉強真っ最中です。文系科目が好きで、特に日本史は人よりも深く掘り下げて勉強しています。でも周りは理系志望が多くて、文系科目の話ができる人がいなくて少し寂しいです。一緒に志望校を目指す仲間が欲しいです。図書館での自習が好きです。",
       profileComplete: true,
+      embedding: null,
     },
   },
   {
@@ -217,15 +233,14 @@ const DUMMY_USERS = [
     createdAt: Date.now(),
     profile: {
       nickname: "だいき",
-      gender: "male",
-      birthYear: 1997,
-      affiliation: "社会人（会社員）",
       studyFields: ["宅建", "行政書士", "資格・検定", "法律"],
-      currentLevel: "宅建取得済。行政書士は今年初挑戦。",
       goal: "行政書士の資格を取得して独立開業する",
+      publicBio: "行政書士として独立開業するという目標に向かって、法律の世界を深く探求しています。同じく法律系の資格を目指す仲間と情報交換しながら高め合いたいです。",
+      privateReality: "宅建取得済みだが行政書士は今年初挑戦。範囲が広く何から手をつければいいか迷っている。",
+      privateAffiliation: "社会人（会社員・不動産業）",
       country: "日本",
-      bio: "不動産会社に勤めています。宅建を取ってから法律の面白さに目覚め、さらに上を目指したくなりました。行政書士は範囲が広くて何から手をつければいいか迷っています。同じように法律系の資格を目指している人と情報交換しながら、お互いに高め合いたいです。",
       profileComplete: true,
+      embedding: null,
     },
   },
   {
@@ -237,15 +252,14 @@ const DUMMY_USERS = [
     createdAt: Date.now(),
     profile: {
       nickname: "えみ",
-      gender: "female",
-      birthYear: 1988,
-      affiliation: "社会人（会社員）",
       studyFields: ["英会話", "TOEIC", "英語", "ビジネス英語"],
-      currentLevel: "TOEIC 720点。読み書きはできるが、話すのが苦手。",
       goal: "英語で自信を持って会議に参加できるようになる",
+      publicBio: "英語で自信を持って国際的に活躍できる人材を目指しています。平日夜や休日に一緒に英語で話す練習ができる仲間を探しています。",
+      privateReality: "TOEIC 720点だがスピーキングが苦手。外資系勤務3年目だが英語ミーティングで発言できずにいる。英会話スクールにも通っているが一人練習に限界を感じている。",
+      privateAffiliation: "社会人（会社員・外資系）",
       country: "日本",
-      bio: "外資系企業に転職して3年目です。社内の英語ミーティングで発言できずにいるのが悩みです。スピーキング力を上げるために英会話スクールにも通っていますが、一人での練習に限界を感じています。お互いに英語で話しかける練習相手を探しています。平日夜と休日に時間が取れます。",
       profileComplete: true,
+      embedding: null,
     },
   },
   {
@@ -257,28 +271,24 @@ const DUMMY_USERS = [
     createdAt: Date.now(),
     profile: {
       nickname: "じゅん",
-      gender: "male",
-      birthYear: 2002,
-      affiliation: "大学生・大学院生",
       studyFields: ["プログラミング", "Python", "AI", "機械学習", "データ分析"],
-      currentLevel: "Python基礎修了。scikit-learnで簡単なモデルを作れる段階。",
       goal: "AI・機械学習エンジニアとして就職する",
+      publicBio: "AIエンジニアとして社会に貢献するというビジョンを持って独学を続けています。Kaggleのコンペや勉強会を一緒に楽しめる仲間を探しています。",
+      privateReality: "Python基礎修了でscikit-learnで簡単なモデルが作れる段階。大学の授業だけでは実践的スキルが身につかないと感じている。Kaggle参加に一人では心細い。",
+      privateAffiliation: "大学生（情報系）",
       country: "日本",
-      bio: "情報系の大学に通っていますが、大学の授業だけでは実践的なスキルが身につかないと感じて独学を始めました。Kaggleのコンペに参加したいけど一人では心細いです。同じようにAIやデータサイエンスを学んでいる人と勉強会をしたり、お互いのコードをレビューし合える関係が理想です。",
       profileComplete: true,
+      embedding: null,
     },
   },
 ];
 
-// seed dummy users
 for (const u of DUMMY_USERS) {
-  u.profile.busyBlocks = DUMMY_SCHEDULES[u.id] || [];
-  u.profile.calendarConnected = true;
   users.set(u.id, u);
   bySub.set(u.google_sub, u.id);
 }
 
-// ---------- exports ----------------------------------------------------------
+// ---------- user exports ------------------------------------------------------
 
 export async function upsertUser({ google_sub, email, name, picture }) {
   const existingId = bySub.get(google_sub);
@@ -307,24 +317,13 @@ export async function getUser(id) {
 }
 
 export async function updateProfile(id, fields) {
-  let u = users.get(id);
-  if (!u) {
-    // サーバー再起動でユーザーデータが消えた場合、JWTのidで再生成する。
-    // google_subが不明なためbySub登録はしない（再ログイン時に新idが発行される）。
-    u = {
-      id,
-      google_sub: `recovered_${id}`,
-      email: null,
-      name: null,
-      picture: null,
-      createdAt: Date.now(),
-      profile: emptyProfile(),
-    };
-    users.set(id, u);
-  }
+  const u = users.get(id);
+  if (!u) return null;
   if (!u.profile) u.profile = emptyProfile();
   Object.assign(u.profile, fields);
-  u.profile.profileComplete = !!(u.profile.nickname && u.profile.bio && u.profile.goal);
+  u.profile.profileComplete = !!(
+    u.profile.nickname && u.profile.goal && u.profile.publicBio
+  );
   return { ...u };
 }
 
@@ -332,9 +331,9 @@ export function getAllUsers() {
   return [...users.values()];
 }
 
-// ---------- connections ------------------------------------------------------
+// ---------- connections -------------------------------------------------------
 
-const connections = new Map(); // convKey -> { from, to, status }
+const connections = new Map();
 let nextConnId = 1;
 
 function convKey(a, b) {
@@ -358,7 +357,7 @@ export function acceptConnect(fromId, toId) {
   const key = convKey(fromId, toId);
   const conn = connections.get(key);
   if (!conn) return null;
-  if (conn.to !== fromId) return null; // only the recipient can accept
+  if (conn.to !== fromId) return null;
   conn.status = "accepted";
   return conn;
 }
@@ -381,7 +380,8 @@ export function getConnections(uid) {
         connId: c.id,
         partnerId,
         nickname: partner?.profile?.nickname || partner?.name || "?",
-        affiliation: partner?.profile?.affiliation || "",
+        studyFields: partner?.profile?.studyFields || [],
+        goal: partner?.profile?.goal || "",
         createdAt: c.createdAt,
       };
     });
@@ -396,15 +396,15 @@ export function getPending(uid) {
         connId: c.id,
         fromId: c.from,
         nickname: sender?.profile?.nickname || sender?.name || "?",
-        affiliation: sender?.profile?.affiliation || "",
+        studyFields: sender?.profile?.studyFields || [],
         createdAt: c.createdAt,
       };
     });
 }
 
-// ---------- messages ---------------------------------------------------------
+// ---------- messages ----------------------------------------------------------
 
-const messages = new Map(); // convKey -> [{ id, fromId, text, createdAt }]
+const messages = new Map();
 let nextMsgId = 1;
 
 export function addMessage(fromId, toId, text) {
@@ -417,4 +417,164 @@ export function addMessage(fromId, toId, text) {
 
 export function getMessages(uid1, uid2) {
   return messages.get(convKey(uid1, uid2)) || [];
+}
+
+// ---------- groups ------------------------------------------------------------
+
+const groups = new Map();
+let nextGroupId = 1;
+const groupMessages = new Map();
+let nextGroupMsgId = 1;
+
+// A group now carries `pending`: a Set of userIds who requested to join but
+// haven't been approved yet. Only the creator can approve/reject them.
+function serializeGroup(g, viewerId) {
+  return {
+    id: g.id,
+    creatorId: g.creatorId,
+    name: g.name,
+    description: g.description,
+    tags: g.tags,
+    members: [...g.members],
+    memberCount: g.members.size,
+    pendingCount: g.pending.size,
+    // viewer-specific flags so the UI can render the right button/state
+    isCreator: viewerId != null && g.creatorId === viewerId,
+    isMember: viewerId != null && g.members.has(viewerId),
+    isPending: viewerId != null && g.pending.has(viewerId),
+    // creators get to see the actual pending requesters (with names)
+    pendingRequests:
+      viewerId != null && g.creatorId === viewerId
+        ? [...g.pending].map((uid) => {
+            const u = users.get(uid);
+            return {
+              userId: uid,
+              nickname: u?.profile?.nickname || u?.name || "?",
+              studyFields: u?.profile?.studyFields || [],
+              goal: u?.profile?.goal || "",
+            };
+          })
+        : undefined,
+  };
+}
+
+export function createGroup(creatorId, name, description, tags) {
+  const id = String(nextGroupId++);
+  const group = {
+    id,
+    creatorId,
+    name,
+    description: description || "",
+    tags: tags || [],
+    members: new Set([creatorId]),
+    pending: new Set(),
+    createdAt: Date.now(),
+  };
+  groups.set(id, group);
+  groupMessages.set(id, []);
+  return serializeGroup(group, creatorId);
+}
+
+// A non-member requests to join. They are NOT added immediately — they go into
+// the pending set until the creator approves. Returns { group, status }.
+export function requestJoinGroup(userId, groupId) {
+  const g = groups.get(groupId);
+  if (!g) return null;
+  if (g.members.has(userId)) return { group: serializeGroup(g, userId), status: "already_member" };
+  g.pending.add(userId);
+  return { group: serializeGroup(g, userId), status: "pending" };
+}
+
+// Creator approves a pending requester -> moves them into members.
+export function approveJoinRequest(creatorId, groupId, requesterId) {
+  const g = groups.get(groupId);
+  if (!g) return null;
+  if (g.creatorId !== creatorId) return { error: "not_creator" };
+  if (!g.pending.has(requesterId)) return { error: "no_such_request" };
+  g.pending.delete(requesterId);
+  g.members.add(requesterId);
+  return { group: serializeGroup(g, creatorId) };
+}
+
+// Creator rejects a pending requester -> removes them from pending.
+export function rejectJoinRequest(creatorId, groupId, requesterId) {
+  const g = groups.get(groupId);
+  if (!g) return null;
+  if (g.creatorId !== creatorId) return { error: "not_creator" };
+  g.pending.delete(requesterId);
+  return { group: serializeGroup(g, creatorId) };
+}
+
+export function isGroupMember(userId, groupId) {
+  return groups.get(groupId)?.members.has(userId) ?? false;
+}
+
+export function getGroups(viewerId) {
+  return [...groups.values()].map((g) => serializeGroup(g, viewerId));
+}
+
+// Raw group objects (Sets intact) — for server-side logic like Gemini suggest.
+export function getGroupsRaw() {
+  return [...groups.values()];
+}
+
+// ---------- seeded dummy groups ----------------------------------------------
+// Created by dummy users so the app has content on first load. Members are
+// existing dummy user IDs (see DUMMY_USERS above, ids "1".."12").
+
+const DUMMY_GROUPS = [
+  {
+    creatorId: "2", name: "難関大学を目指す浪人生の会",
+    description: "東大・早慶など難関大を目指す浪人生の進捗共有グループ。朝活報告と模試の振り返りを中心に、孤独になりがちな浪人生活を一緒に乗り越えましょう。",
+    tags: ["大学受験", "浪人", "難関大"], members: ["2", "1"],
+  },
+  {
+    creatorId: "3", name: "働きながらTOEIC・英語",
+    description: "残業や育児の合間に英語を続ける社会人グループ。スキマ時間の使い方やTOEIC・英会話の教材情報を交換しています。忙しくても諦めない仲間募集中。",
+    tags: ["TOEIC", "英語", "社会人", "英会話"], members: ["3", "11"],
+  },
+  {
+    creatorId: "4", name: "未経験からのデータ分析・ML",
+    description: "他業種からデータサイエンス・機械学習に転身を目指す人の集まり。Kaggleや学習ロードマップの相談、独学の不安を共有しています。",
+    tags: ["データ分析", "機械学習", "Python", "転職", "AI"], members: ["4", "12"],
+  },
+  {
+    creatorId: "6", name: "難関資格に挑む社会人",
+    description: "会計士・行政書士など難関資格を働きながら目指す人のグループ。早朝学習の進捗報告と、心が折れそうな時の励まし合いの場です。",
+    tags: ["公認会計士", "行政書士", "簿記", "資格・検定", "社会人"], members: ["6", "10"],
+  },
+  {
+    creatorId: "7", name: "海外大学院・留学準備",
+    description: "海外大学院進学やTOEFLに挑む人のグループ。スピーキング練習の相手探しや出願準備の情報交換をしています。海外という共通の夢を語り合いましょう。",
+    tags: ["大学院受験", "TOEFL", "留学", "英語"], members: ["7"],
+  },
+];
+
+for (const dg of DUMMY_GROUPS) {
+  const id = String(nextGroupId++);
+  const group = {
+    id,
+    creatorId: dg.creatorId,
+    name: dg.name,
+    description: dg.description,
+    tags: dg.tags,
+    members: new Set(dg.members),
+    pending: new Set(),
+    createdAt: Date.now(),
+  };
+  groups.set(id, group);
+  groupMessages.set(id, []);
+}
+
+export function addGroupMessage(groupId, fromId, text) {
+  const msgs = groupMessages.get(groupId);
+  if (msgs === undefined) return null;
+  const msg = { id: String(nextGroupMsgId++), fromId, text, createdAt: Date.now() };
+  msgs.push(msg);
+  return msg;
+}
+
+export function getGroupMessages(groupId) {
+  const msgs = groupMessages.get(groupId);
+  return msgs === undefined ? null : msgs;
 }

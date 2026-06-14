@@ -136,6 +136,32 @@ export function sharedFreeWindows(busyBlocksA, busyBlocksB, opts = {}) {
   return windows.slice(0, limit);
 }
 
+// N-way intersection: find slots when ALL group members are free simultaneously.
+// Privacy guarantee is identical — only the intersection is ever exposed.
+export function groupFreeWindows(allBusyBlocks, opts = {}) {
+  const {
+    earliest = "06:00",
+    latest = "24:00",
+    minMinutes = 30,
+    limit = 8,
+  } = opts;
+
+  const earliestMin = hhmmToMinutes(earliest);
+  const latestMin = latest === "24:00" ? 24 * 60 : hhmmToMinutes(latest);
+  const bitmaps = (allBusyBlocks || []).map((b) => busyBitmapFromBlocks(b || []));
+
+  const free = new Uint8Array(TOTAL_SLOTS);
+  for (let s = 0; s < TOTAL_SLOTS; s++) {
+    const minuteOfDay = (s % SLOTS_PER_DAY) * SLOT_MINUTES;
+    if (minuteOfDay < earliestMin || minuteOfDay >= latestMin) continue;
+    if (bitmaps.every((b) => b[s] === 0)) free[s] = 1;
+  }
+
+  const windows = freeWindows(free, minMinutes);
+  windows.sort((a, b) => b.minutes - a.minutes || a.day - b.day);
+  return windows.slice(0, limit);
+}
+
 // Pick the single best slot of a given length inside the shared windows.
 // Used to anchor the teaching session at a concrete time.
 export function bestSlot(windows, desiredMinutes = 25) {

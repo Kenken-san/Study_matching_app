@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 120" width="360" height="120" role="img" aria-label="peers">
+  <rect width="360" height="120" rx="16" fill="#5dc8cd"/>
+  <g transform="translate(74, 60) rotate(-18)">
+    <path d="M 0,-30 C -11,-37 -29,-37 -40,-31 L -40,27 C -29,21 -11,21 0,28 C 11,21 29,21 40,27 L 40,-31 C 29,-37 11,-37 0,-30 Z" fill="#ffffff"/>
+    <path d="M 0,-30 L 0,28" stroke="#5dc8cd" stroke-width="3.4" stroke-linecap="round"/>
+    <path d="M -31,-23 C -23,-26 -11,-26 -5,-22 M -31,-14 C -23,-17 -11,-17 -5,-13 M -31,-5 C -23,-8 -11,-8 -5,-4" stroke="#5dc8cd" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.55"/>
+    <path d="M 5,-22 C 11,-26 23,-26 31,-23 M 5,-13 C 11,-17 23,-17 31,-14 M 5,-4 C 11,-8 23,-8 31,-5" stroke="#5dc8cd" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.55"/>
+  </g>
+  <text x="124" y="82" font-family="'Quicksand', 'Trebuchet MS', sans-serif" font-weight="600" font-size="62" fill="#ffffff" letter-spacing="-2">peers</text>
+</svg>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="peers">
+  <rect width="512" height="512" rx="112" fill="#5dc8cd"/>
+  <g transform="translate(256, 268) rotate(-18) scale(2.55)">
+    <path d="M 0,-44 C -16,-54 -42,-54 -58,-46 L -58,40 C -42,32 -16,32 0,42 C 16,32 42,32 58,40 L 58,-46 C 42,-54 16,-54 0,-44 Z" fill="#ffffff"/>
+    <path d="M 0,-44 L 0,42" stroke="#5dc8cd" stroke-width="5" stroke-linecap="round"/>
+    <path d="M -46,-34 C -34,-39 -16,-39 -8,-33 M -46,-20 C -34,-25 -16,-25 -8,-19 M -46,-6 C -34,-11 -16,-11 -8,-5" stroke="#5dc8cd" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.5"/>
+    <path d="M 8,-33 C 16,-39 34,-39 46,-34 M 8,-19 C 16,-25 34,-25 46,-20 M 8,-5 C 16,-11 34,-11 46,-6" stroke="#5dc8cd" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.5"/>
+  </g>
+</svg>

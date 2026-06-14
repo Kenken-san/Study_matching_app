@@ -2,13 +2,17 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import jwt from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
+import 'dotenv/config';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import {
   upsertUser, getUser, updateProfile, getAllUsers,
   sendConnect, acceptConnect, getConnectionStatus, getConnections, getPending,
   addMessage, getMessages,
+  cosineSimilarity, initDummyEmbeddings,
+  createGroup, requestJoinGroup, approveJoinRequest, rejectJoinRequest,
+  isGroupMember, getGroups, getGroupsRaw, addGroupMessage, getGroupMessages,
 } from "./db.js";
-import { sharedFreeWindows, bestSlot, getBusyBlocks } from "./availability.js";
+import { sharedFreeWindows, groupFreeWindows, bestSlot, getBusyBlocks } from "./availability.js";
 
 const {
   GOOGLE_CLIENT_ID,
@@ -23,6 +27,29 @@ if (!GOOGLE_CLIENT_ID || !SESSION_SECRET) {
 
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null;
+
+async function generateEmbedding(text) {
+  if (!GEMINI_API_KEY || !text?.trim()) return null;
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1/models/gemini-embedding-2:embedContent?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: { parts: [{ text: text.trim() }] } }),
+      }
+    );
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || "Embedding API error");
+    }
+    const data = await res.json();
+    return data.embedding.values;
+  } catch (err) {
+    console.error("Embedding error:", err.message);
+    return null;
+  }
+}
 
 const app = express();
 app.use(express.json());
@@ -80,10 +107,63 @@ app.post("/api/auth/google", async (req, res) => {
   }
 });
 
-// --- Config ------------------------------------------------------------------
+// --- Public config (safe to expose) ------------------------------------------
 
-app.get("/api/config", (req, res) => {
-  res.json({ googleClientId: process.env.GOOGLE_CLIENT_ID });
+app.get("/api/config", (_req, res) => {
+  res.json({ googleClientId: GOOGLE_CLIENT_ID });
+});
+
+// --- Gemini coach: study plan + first message for a matched pair -------------
+
+app.post("/api/coach/:partnerId", requireSession, async (req, res) => {
+  try {
+    const [me, them] = await Promise.all([getUser(req.uid), getUser(req.params.partnerId)]);
+    if (!me || !them) return res.status(404).json({ error: "ユーザーが見つかりません" });
+
+    if (!genAI) {
+      return res.json({
+        compatibility: "プロフィールを見ると、学習スタイルや目標に共通点がありそうです。",
+        plan: ["目標と締め切りを共有する", "週1回の進捗確認を設定する", "お互いの得意分野を活かして教え合う"],
+        firstMessage: `こんにちは！${them.profile?.nickname || "さん"}、一緒に勉強しませんか？`,
+      });
+    }
+
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const prompt = `あなたはスタディマッチングのコーチです。以下の2人のプロフィールを読み、JSON形式で返答してください。
+
+【自分】
+ニックネーム: ${me.profile?.nickname || ""}
+分野: ${(me.profile?.studyFields || []).join(", ")}
+目標: ${me.profile?.goal || ""}
+公開プロフィール: ${me.profile?.publicBio || ""}
+非公開メモ: ${me.profile?.privateReality || ""}
+
+【相手】
+ニックネーム: ${them.profile?.nickname || ""}
+分野: ${(them.profile?.studyFields || []).join(", ")}
+目標: ${them.profile?.goal || ""}
+公開プロフィール: ${them.profile?.publicBio || ""}
+
+以下のJSON形式のみで返答（コードブロック不要）:
+{
+  "compatibility": "二人の相性についての1〜2文（温かく前向きに。非公開情報は含めないこと）",
+  "plan": ["ステップ1", "ステップ2", "ステップ3"],
+  "firstMessage": "最初のメッセージの提案文（相手のニックネームを使って自然に）"
+}`;
+
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text().trim()
+      .replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
+    const parsed = JSON.parse(raw);
+    res.json({
+      compatibility: parsed.compatibility || "",
+      plan: Array.isArray(parsed.plan) ? parsed.plan : [],
+      firstMessage: parsed.firstMessage || "",
+    });
+  } catch (err) {
+    console.error("Coach error:", err.message);
+    res.status(500).json({ error: "学習プランの生成に失敗しました: " + err.message });
+  }
 });
 
 // --- Who am I ----------------------------------------------------------------
@@ -105,18 +185,35 @@ app.post("/api/auth/logout", (req, res) => {
 
 app.get("/api/profile", requireSession, async (req, res) => {
   const user = await getUser(req.uid);
-  res.json({ profile: user?.profile || {} });
+  if (!user) return res.status(404).json({ error: "User not found" });
+  res.json({ profile: user.profile || {} });
 });
 
 app.put("/api/profile", requireSession, async (req, res) => {
   const allowed = [
-    "nickname", "gender", "birthYear", "affiliation",
-    "studyFields", "currentLevel", "goal", "country", "bio",
+    "nickname", "studyFields", "goal", "country",
+    "publicBio", "privateReality", "privateAffiliation",
   ];
   const fields = {};
   for (const key of allowed) {
     if (req.body[key] !== undefined) fields[key] = req.body[key];
   }
+
+  if (genAI) {
+    const current = await getUser(req.uid);
+    const merged = { ...(current?.profile || {}), ...fields };
+    const embeddingText = [
+      merged.privateAffiliation,
+      (merged.studyFields || []).join(", "),
+      merged.goal,
+      merged.publicBio,
+      merged.privateReality,
+    ].filter(Boolean).join(" ");
+    if (embeddingText.trim()) {
+      fields.embedding = await generateEmbedding(embeddingText);
+    }
+  }
+
   const user = await updateProfile(req.uid, fields);
   if (!user) return res.status(404).json({ error: "User not found" });
   matchCache.delete(req.uid);
@@ -133,36 +230,21 @@ app.get("/api/users", requireSession, async (req, res) => {
     .map((u) => ({
       id: u.id,
       nickname: u.profile.nickname,
-      affiliation: u.profile.affiliation,
       studyFields: u.profile.studyFields,
       goal: u.profile.goal,
-      bio: u.profile.bio,
+      bio: u.profile.publicBio,
       country: u.profile.country,
     }));
   res.json({ users: candidates });
 });
 
-// --- Matching ----------------------------------------------------------------
+// --- Matching (RAG pipeline) -------------------------------------------------
 
-// Simple in-memory cache: key = uid, value = { result, expiresAt }
 const matchCache = new Map();
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
-
-// Coach cache: key = convKey(uid1,uid2), TTL 30 min
-const coachCache = new Map();
-const COACH_TTL_MS = 30 * 60 * 1000;
-
-function jaccardScore(a, b) {
-  const setA = new Set(a);
-  const setB = new Set(b);
-  const intersection = [...setA].filter((x) => setB.has(x)).length;
-  const union = new Set([...setA, ...setB]).size;
-  return union === 0 ? 0 : intersection / union;
-}
+const CACHE_TTL_MS = 5 * 60 * 1000;
 
 app.post("/api/match", requireSession, async (req, res) => {
   try {
-    // Check cache
     const cached = matchCache.get(req.uid);
     if (cached && cached.expiresAt > Date.now()) {
       return res.json(cached.result);
@@ -174,103 +256,113 @@ app.post("/api/match", requireSession, async (req, res) => {
     }
 
     const all = getAllUsers();
-    const candidates = all.filter(
-      (u) => u.id !== req.uid && u.profile?.profileComplete
-    );
+    const candidates = all.filter((u) => u.id !== req.uid && u.profile?.profileComplete);
 
     if (candidates.length === 0) {
       return res.json({ geminiMatches: [], tagMatches: [] });
     }
 
-    // Tag-only matching (Jaccard)
-    const tagMatches = candidates
+    // Tag-based Jaccard similarity
+    function tagScore(fieldsA, fieldsB) {
+      const a = new Set(fieldsA || []);
+      const b = new Set(fieldsB || []);
+      if (!a.size && !b.size) return 0;
+      const inter = [...a].filter((x) => b.has(x)).length;
+      const union = new Set([...a, ...b]).size;
+      return union ? inter / union : 0;
+    }
+
+    // Embedding-ranked top 10 (Gemini matches)
+    const ranked = candidates
       .map((u) => ({
-        id: u.id,
-        nickname: u.profile.nickname,
-        affiliation: u.profile.affiliation,
-        studyFields: u.profile.studyFields,
-        goal: u.profile.goal,
-        bio: u.profile.bio,
-        tagScore: Math.round(
-          jaccardScore(me.profile.studyFields, u.profile.studyFields) * 100
-        ),
-        reason: null,
-        geminiScore: null,
+        user: u,
+        score: cosineSimilarity(me.profile.embedding, u.profile.embedding),
+        tScore: tagScore(me.profile.studyFields, u.profile.studyFields),
       }))
-      .sort((a, b) => b.tagScore - a.tagScore)
-      .slice(0, 3);
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 10);
 
-    // Gemini deep matching
-    let geminiMatches = [];
+    // Tag-ranked top 10
+    const tagRanked = [...candidates]
+      .map((u) => ({ user: u, tScore: tagScore(me.profile.studyFields, u.profile.studyFields) }))
+      .sort((a, b) => b.tScore - a.tScore)
+      .slice(0, 10);
+
+    // Build base geminiMatches (insight filled in below)
+    let geminiMatches = ranked.map(({ user: u, score, tScore }) => ({
+      id: u.id,
+      nickname: u.profile.nickname,
+      studyFields: u.profile.studyFields || [],
+      goal: u.profile.goal,
+      publicBio: u.profile.publicBio,
+      geminiScore: Math.round(score * 100),
+      tagScore: Math.round(tScore * 100),
+      reason: null,
+    }));
+
+    const tagMatches = tagRanked.map(({ user: u, tScore }) => ({
+      id: u.id,
+      nickname: u.profile.nickname,
+      studyFields: u.profile.studyFields || [],
+      goal: u.profile.goal,
+      publicBio: u.profile.publicBio,
+      tagScore: Math.round(tScore * 100),
+    }));
+
+    // Generate: compatibility insights for the top candidates
     if (genAI) {
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      try {
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const candidateList = ranked
+          .map(({ user: u }, i) =>
+            `候補 ${i + 1} (ID: ${u.id})
+ニックネーム: ${u.profile.nickname}
+分野: ${(u.profile.studyFields || []).join(", ")}
+目標: ${u.profile.goal}
+公開プロフィール: ${u.profile.publicBio}
+【AI用非公開データ】現状/悩み: ${u.profile.privateReality}
+非公開所属: ${u.profile.privateAffiliation}`
+          )
+          .join("\n\n---\n\n");
 
-      const candidateList = candidates
-        .map(
-          (u) =>
-            `ユーザーID: ${u.id}\nニックネーム: ${u.profile.nickname}\n所属: ${u.profile.affiliation}\n分野: ${u.profile.studyFields.join(", ")}\n目標: ${u.profile.goal}\n自己紹介: ${u.profile.bio}`
-        )
-        .join("\n\n---\n\n");
+        const prompt = `あなたはスタディマッチングのアシスタントです。以下の「自分」と候補ユーザーのプロフィールを読み、各候補との相性について1〜2文の洞察を書いてください。
 
-      const prompt = `あなたは勉強グループマッチングのAIアシスタントです。
-以下の「自分」のプロフィールを読んで、候補ユーザーの中から最も相性の良い3人を選び、それぞれ「なぜ合うか」を1〜2文の温かみのある日本語で説明してください。
-
-タグやキーワードの一致だけでなく、勉強スタイル・価値観・動機・感情的なニーズなど、文章から読み取れる深いレベルの相性を重視してください。
+重要なルール：
+- 絵文字を一切使用しないこと
+- 洗練された、温かみのあるプロフェッショナルなトーンで日本語で書くこと
+- 「AI用非公開データ」に記載された情報（現在の所属、現状、悩みなど）は深い心理的・状況的な相性を見抜くためにのみ使用すること
+- 出力するinsightフィールドには、非公開データの内容（スコア、悩み、具体的な現状など）を一切漏らしてはならない
+- insightは、共通の目標や公開されたビジョンのみに基づいた、前向きで温かい1〜2文にすること
 
 【自分のプロフィール】
 ニックネーム: ${me.profile.nickname}
-所属: ${me.profile.affiliation}
-分野: ${me.profile.studyFields.join(", ")}
+分野: ${(me.profile.studyFields || []).join(", ")}
 目標: ${me.profile.goal}
-自己紹介: ${me.profile.bio}
+公開プロフィール: ${me.profile.publicBio}
+【AI用非公開データ】現状/悩み: ${me.profile.privateReality}
+非公開所属: ${me.profile.privateAffiliation}
 
-【候補ユーザー一覧】
+【候補ユーザー】
 ${candidateList}
 
-以下のJSON形式のみで返答してください（説明文は不要）:
-[
-  {"userId": "...", "reason": "...（1〜2文）", "score": 数値(0-100)},
-  {"userId": "...", "reason": "...（1〜2文）", "score": 数値(0-100)},
-  {"userId": "...", "reason": "...（1〜2文）", "score": 数値(0-100)}
-]`;
+以下のJSON形式のみで返答してください（コードブロック不要）:
+[{"userId": "...", "insight": "..."}, ...]`;
 
-      const geminiRes = await model.generateContent(prompt);
-      const text = geminiRes.response.text().trim();
-
-      // parse JSON from Gemini response (strip markdown fences if present)
-      const jsonText = text.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
-      const parsed = JSON.parse(jsonText);
-
-      geminiMatches = parsed.map((item) => {
-        const u = candidates.find((c) => c.id === item.userId);
-        return {
-          id: item.userId,
-          nickname: u?.profile.nickname || "?",
-          affiliation: u?.profile.affiliation || "",
-          studyFields: u?.profile.studyFields || [],
-          goal: u?.profile.goal || "",
-          bio: u?.profile.bio || "",
-          tagScore: Math.round(
-            jaccardScore(me.profile.studyFields, u?.profile.studyFields || []) * 100
-          ),
-          geminiScore: item.score,
-          reason: item.reason,
-        };
-      });
-    } else {
-      // Fallback: use tag matching when no Gemini key
-      geminiMatches = tagMatches.map((m) => ({
-        ...m,
-        geminiScore: m.tagScore,
-        reason: "（Gemini APIキーが設定されていないため、タグマッチで代替しています）",
-      }));
+        const geminiRes = await model.generateContent(prompt);
+        const raw = geminiRes.response.text().trim()
+          .replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
+        const parsed = JSON.parse(raw);
+        for (const item of parsed) {
+          const match = geminiMatches.find((m) => m.id === item.userId);
+          if (match) match.reason = item.insight;
+        }
+      } catch (err) {
+        console.error("Gemini insight error:", err.message);
+      }
     }
 
     const result = { geminiMatches, tagMatches };
-
-    // Cache the result
     matchCache.set(req.uid, { result, expiresAt: Date.now() + CACHE_TTL_MS });
-
     res.json(result);
   } catch (err) {
     console.error("Match error:", err.message);
@@ -322,81 +414,8 @@ app.get("/api/messages/:targetId", requireSession, (req, res) => {
   res.json({ messages: getMessages(req.uid, req.params.targetId) });
 });
 
-// --- AI Study Partner Coach --------------------------------------------------
-
-function convKeyStr(a, b) { return [a, b].sort().join("_"); }
-
-app.post("/api/coach/:targetId", requireSession, async (req, res) => {
-  try {
-    const { targetId } = req.params;
-    const status = getConnectionStatus(req.uid, targetId);
-    if (status !== "accepted") return res.status(403).json({ error: "繋がっていません" });
-
-    const cacheKey = convKeyStr(req.uid, targetId);
-    const cached = coachCache.get(cacheKey);
-    if (cached && cached.expiresAt > Date.now()) return res.json(cached.result);
-
-    const [me, partner] = await Promise.all([getUser(req.uid), getUser(targetId)]);
-    if (!me?.profile?.profileComplete || !partner?.profile?.profileComplete) {
-      return res.status(400).json({ error: "プロフィールを完成させてください" });
-    }
-
-    let result;
-
-    if (genAI) {
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-      const prompt = `あなたは勉強パートナーコーチングAIです。
-以下の2人のプロフィールを読み、この2人のための具体的な勉強パートナーシッププランと、最初に送るとよいメッセージを生成してください。
-タグや分野の一致だけでなく、勉強スタイル・動機・感情的なニーズを深く読み取ってください。
-
-【ユーザーA（あなた）】
-ニックネーム: ${me.profile.nickname}
-所属: ${me.profile.affiliation}
-分野: ${me.profile.studyFields.join(", ")}
-目標: ${me.profile.goal}
-自己紹介: ${me.profile.bio}
-
-【ユーザーB（相手）】
-ニックネーム: ${partner.profile.nickname}
-所属: ${partner.profile.affiliation}
-分野: ${partner.profile.studyFields.join(", ")}
-目標: ${partner.profile.goal}
-自己紹介: ${partner.profile.bio}
-
-以下のJSON形式のみで返答してください（他の説明文は不要）:
-{
-  "compatibility": "（この2人が合う理由を1〜2文。感情・学習スタイルの視点で温かく）",
-  "plan": ["（具体的な行動1）", "（具体的な行動2）", "（具体的な行動3）"],
-  "firstMessage": "（ユーザーAが相手に送る、自然で温かみのある最初のメッセージ。30〜60文字程度）"
-}`;
-
-      const geminiRes = await model.generateContent(prompt);
-      const text = geminiRes.response.text().trim();
-      const jsonText = text.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
-      result = JSON.parse(jsonText);
-    } else {
-      // Fallback without Gemini
-      const shared = me.profile.studyFields.filter((f) => partner.profile.studyFields.includes(f));
-      result = {
-        compatibility: `${me.profile.nickname}さんと${partner.profile.nickname}さんは${shared.length > 0 ? shared.join("・") + "という共通の分野で" : "同じ目標に向かって"}取り組んでいます。`,
-        plan: ["週1回、今週やったことを短く共有する", "わからなかったことを気軽に質問し合う", "お互いの目標の進捗を定期的に確認する"],
-        firstMessage: `${partner.profile.nickname}さん、はじめまして！お互い${shared[0] || "勉強"}頑張っていますね。一緒に進められたら嬉しいです！`,
-      };
-    }
-
-    coachCache.set(cacheKey, { result, expiresAt: Date.now() + COACH_TTL_MS });
-    res.json(result);
-  } catch (err) {
-    console.error("Coach error:", err.message);
-    res.status(500).json({ error: "コーチデータの生成に失敗しました: " + err.message });
-  }
-});
-
 // --- Availability (privacy-preserving shared free time) ----------------------
 
-// POST /api/availability  { targetId: "..." }
-// Returns ONLY the shared free windows. Never returns either user's busy
-// blocks or any event detail — only the intersection of free time.
 app.post("/api/availability", requireSession, async (req, res) => {
   try {
     const { targetId } = req.body;
@@ -422,10 +441,8 @@ app.post("/api/availability", requireSession, async (req, res) => {
       target: { id: them.id, nickname: them.profile?.nickname || "?" },
       windows,
       bestSlot: slot,
-      hasData: !!(them.profile?.calendarConnected) || theirBusy.length > 0,
-      myHasData: !!(me.profile?.calendarConnected) || myBusy.length > 0,
-      privacyNote:
-        "お互いの予定の中身は共有されません。二人とも空いている時間だけを計算しています。",
+      hasData: myBusy.length > 0 && theirBusy.length > 0,
+      privacyNote: "お互いの予定の中身は共有されません。二人とも空いている時間だけを計算しています。",
     });
   } catch (err) {
     console.error("Availability error:", err.message);
@@ -434,8 +451,6 @@ app.post("/api/availability", requireSession, async (req, res) => {
 });
 
 // --- Google Calendar connect (free/busy only) --------------------------------
-// Reduces the user's real calendar to anonymous weekly busy blocks and stores
-// them on the profile. We never store event titles/details — only busy times.
 
 function localParts(timeZone, date) {
   const dtf = new Intl.DateTimeFormat("en-US", {
@@ -462,7 +477,6 @@ function collapseToWeeklyTemplate(busy, timeZone) {
   return blocks;
 }
 
-// POST /api/calendar/connect  { accessToken, timeZone }
 app.post("/api/calendar/connect", requireSession, async (req, res) => {
   try {
     const { accessToken, timeZone = "Asia/Tokyo" } = req.body;
@@ -491,7 +505,7 @@ app.post("/api/calendar/connect", requireSession, async (req, res) => {
     }
     const busy = data.calendars?.primary?.busy || [];
     const busyBlocks = collapseToWeeklyTemplate(busy, timeZone);
-    await updateProfile(req.uid, { busyBlocks, calendarConnected: true });
+    await updateProfile(req.uid, { busyBlocks });
     res.json({ ok: true, blockCount: busyBlocks.length });
   } catch (err) {
     console.error("Calendar connect error:", err.message);
@@ -499,4 +513,197 @@ app.post("/api/calendar/connect", requireSession, async (req, res) => {
   }
 });
 
-app.listen(PORT, () => console.log(`http://localhost:${PORT}`));
+// --- Groups ------------------------------------------------------------------
+
+app.post("/api/groups", requireSession, (req, res) => {
+  const { name, description, tags } = req.body;
+  if (!name?.trim()) return res.status(400).json({ error: "グループ名は必須です" });
+  const group = createGroup(req.uid, name.trim(), description?.trim() || "", tags || []);
+  res.json({ group });
+});
+
+// Request to join — goes to the creator's pending queue, not an instant join.
+app.post("/api/groups/:groupId/join", requireSession, (req, res) => {
+  const result = requestJoinGroup(req.uid, req.params.groupId);
+  if (!result) return res.status(404).json({ error: "グループが見つかりません" });
+  res.json(result); // { group, status: "pending" | "already_member" }
+});
+
+// Creator approves a pending requester.
+app.put("/api/groups/:groupId/approve/:userId", requireSession, (req, res) => {
+  const result = approveJoinRequest(req.uid, req.params.groupId, req.params.userId);
+  if (!result) return res.status(404).json({ error: "グループが見つかりません" });
+  if (result.error === "not_creator")
+    return res.status(403).json({ error: "承認できるのは作成者のみです" });
+  if (result.error === "no_such_request")
+    return res.status(404).json({ error: "参加申請が見つかりません" });
+  res.json({ group: result.group });
+});
+
+// Creator rejects a pending requester.
+app.put("/api/groups/:groupId/reject/:userId", requireSession, (req, res) => {
+  const result = rejectJoinRequest(req.uid, req.params.groupId, req.params.userId);
+  if (!result) return res.status(404).json({ error: "グループが見つかりません" });
+  if (result.error === "not_creator")
+    return res.status(403).json({ error: "操作できるのは作成者のみです" });
+  res.json({ group: result.group });
+});
+
+app.get("/api/groups", requireSession, (req, res) => {
+  res.json({ groups: getGroups(req.uid) });
+});
+
+// ── Gemini: suggest groups for the current user ───────────────────────────────
+// Why AI here: matching a person to a GROUP is not similarity search. It needs
+// reasoning over the user's private situation (struggles, level, schedule) AND
+// each group's purpose, then judging fit and articulating WHY — while never
+// leaking the private data into the public-facing reason. That is a language
+// task an embedding/cosine pipeline cannot do.
+app.post("/api/groups/suggest", requireSession, async (req, res) => {
+  try {
+    const me = await getUser(req.uid);
+    if (!me?.profile?.profileComplete) {
+      return res.status(400).json({ error: "プロフィールを完成させてください" });
+    }
+
+    // Candidate groups: those the user hasn't joined and didn't create.
+    const candidates = getGroupsRaw().filter(
+      (g) => !g.members.has(req.uid) && g.creatorId !== req.uid
+    );
+
+    // Tag-overlap fallback used when no Gemini or on Gemini failure.
+    const tagFallback = () => {
+      const mine = new Set(me.profile.studyFields || []);
+      const ranked = candidates
+        .map((g) => ({ g, overlap: (g.tags || []).filter((t) => mine.has(t)).length }))
+        .sort((a, b) => b.overlap - a.overlap)
+        .slice(0, 3)
+        .map(({ g }) => ({ groupId: g.id, reason: "" }));
+      return res.json({ suggestions: ranked, ai: false });
+    };
+
+    if (!candidates.length) return res.json({ suggestions: [], ai: false });
+    if (!genAI) return tagFallback();
+
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const groupList = candidates
+      .map((g) =>
+        `グループ ID: ${g.id}\n名前: ${g.name}\n説明: ${g.description || ""}\nタグ: ${(g.tags || []).join(", ")}\n人数: ${g.members.size}`
+      )
+      .join("\n\n---\n\n");
+
+    const prompt = `あなたはスタディマッチングのアシスタントです。以下の「ユーザー」に最も合うスタディグループを最大3つ選び、それぞれの推薦理由を1〜2文で書いてください。
+
+重要なルール：
+- 絵文字を一切使用しないこと
+- 温かみのあるプロフェッショナルなトーンで日本語で書くこと
+- 「AI用非公開データ」は相性判断にのみ使い、reason には一切含めないこと
+- reason は公開情報とグループの目的のみに基づくこと
+- 合うグループが3つ未満なら、合うものだけ返すこと
+
+【ユーザー】
+ニックネーム: ${me.profile.nickname || ""}
+分野: ${(me.profile.studyFields || []).join(", ")}
+目標: ${me.profile.goal || ""}
+公開プロフィール: ${me.profile.publicBio || ""}
+【AI用非公開データ】現状/悩み: ${me.profile.privateReality || ""}
+
+【候補グループ】
+${groupList}
+
+以下のJSON形式のみで返答してください（コードブロック不要）:
+[{"groupId": "...", "reason": "..."}, ...]`;
+
+    let parsed;
+    try {
+      const geminiRes = await model.generateContent(prompt);
+      const raw = geminiRes.response.text().trim()
+        .replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
+      parsed = JSON.parse(raw);
+    } catch (geminiErr) {
+      console.error("Group suggest Gemini error:", geminiErr.message);
+      return tagFallback();
+    }
+
+    const validIds = new Set(candidates.map((g) => g.id));
+    const suggestions = parsed
+      .filter((s) => s?.groupId && validIds.has(s.groupId))
+      .slice(0, 3);
+    res.json({ suggestions, ai: true });
+  } catch (err) {
+    console.error("Group suggest error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Group schedule: when is every member free? ────────────────────────────────
+app.post("/api/groups/:groupId/availability", requireSession, async (req, res) => {
+  try {
+    const raw = getGroupsRaw().find((g) => g.id === req.params.groupId);
+    if (!raw) return res.status(404).json({ error: "グループが見つかりません" });
+
+    const memberIds = [...raw.members];
+    const members = (await Promise.all(memberIds.map((id) => getUser(id)))).filter(Boolean);
+
+    const allBusy = members.map((u) => getBusyBlocks(u));
+    const withCalendar = allBusy.filter((b) => b.length > 0).length;
+
+    const windows = groupFreeWindows(allBusy, { earliest: "06:00", latest: "24:00", minMinutes: 30, limit: 8 });
+    const slot = bestSlot(windows, 60);
+
+    // Gemini: suggest what the group could study together during the best slot
+    let suggestion = null;
+    if (genAI && slot && windows.length > 0) {
+      try {
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const memberProfiles = members
+          .map((u) => `- ${u.profile.nickname || "?"}: 分野=${(u.profile.studyFields || []).join(", ")} 目標=${u.profile.goal || ""}`)
+          .join("\n");
+        const prompt = `スタディグループのメンバー全員が${slot.label}に空いています。以下のメンバーのプロフィールを読んで、この時間に一緒に取り組むと効果的な学習テーマや活動を1〜2文で提案してください。絵文字なし、日本語で。\n\nメンバー:\n${memberProfiles}`;
+        const r = await model.generateContent(prompt);
+        suggestion = r.response.text().trim();
+      } catch (e) {
+        console.error("Group avail Gemini error:", e.message);
+      }
+    }
+
+    res.json({
+      windows,
+      bestSlot: slot,
+      hasData: withCalendar >= 2,
+      memberCount: members.length,
+      membersWithCalendar: withCalendar,
+      aiSuggestion: suggestion,
+      privacyNote: "メンバー全員が空いている時間帯のみ表示。各メンバーの予定の詳細は共有されません。",
+    });
+  } catch (err) {
+    console.error("Group availability error:", err.message);
+    res.status(500).json({ error: "空き時間の計算中にエラーが発生しました" });
+  }
+});
+
+app.post("/api/groups/:groupId/messages", requireSession, (req, res) => {
+  const { text } = req.body;
+  if (!text?.trim()) return res.status(400).json({ error: "メッセージが空です" });
+  if (!isGroupMember(req.uid, req.params.groupId)) {
+    return res.status(403).json({ error: "グループに参加してからメッセージできます" });
+  }
+  const msg = addGroupMessage(req.params.groupId, req.uid, text.trim());
+  if (!msg) return res.status(404).json({ error: "グループが見つかりません" });
+  res.json({ msg });
+});
+
+app.get("/api/groups/:groupId/messages", requireSession, (req, res) => {
+  const msgs = getGroupMessages(req.params.groupId);
+  if (msgs === null) return res.status(404).json({ error: "グループが見つかりません" });
+  res.json({ messages: msgs });
+});
+
+app.listen(PORT, () => {
+  console.log(`http://localhost:${PORT}`);
+  if (genAI) {
+    initDummyEmbeddings(generateEmbedding)
+      .then(() => console.log("Dummy embeddings ready"))
+      .catch((err) => console.error("Embedding init error:", err.message));
+  }
+});
