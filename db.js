@@ -415,14 +415,6 @@ export function addMessage(fromId, toId, text) {
   return msg;
 }
 
-export function addGeminiMessage(uid1, uid2, text) {
-  const key = convKey(uid1, uid2);
-  if (!messages.has(key)) messages.set(key, []);
-  const msg = { id: String(nextMsgId++), fromId: "gemini", text, createdAt: Date.now() };
-  messages.get(key).push(msg);
-  return msg;
-}
-
 export function getMessages(uid1, uid2) {
   return messages.get(convKey(uid1, uid2)) || [];
 }

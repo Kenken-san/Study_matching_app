@@ -391,6 +391,7 @@
     let pollTimer = null;
     let connections = [];
     let pending = [];
+    let localGeminiMessages = []; // { partnerId, text, createdAt } — 自分だけに見える
 
     const DAYS_JA = ["月", "火", "水", "木", "金", "土", "日"];
 
@@ -716,11 +717,19 @@
       btn.disabled = true;
       btn.textContent = "⏳";
       try {
-        await fetch(`/api/ask-gemini/${currentPartnerId}`, {
+        const r = await fetch(`/api/ask-gemini/${currentPartnerId}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ question }),
         });
+        const data = await r.json();
+        if (data.text) {
+          localGeminiMessages.push({
+            partnerId: currentPartnerId,
+            text: data.text,
+            createdAt: Date.now(),
+          });
+        }
         await fetchMessages();
       } catch {
         input.value = question;
@@ -751,10 +760,16 @@
         return;
       }
 
-      wrap.innerHTML = msgs.map((m) => {
+      // ローカルのGeminiメッセージ（自分だけ見える）とマージして時系列ソート
+      const localForChat = localGeminiMessages
+        .filter((m) => m.partnerId === currentPartnerId)
+        .map((m) => ({ fromId: "gemini", text: m.text, createdAt: m.createdAt }));
+      const all = [...msgs, ...localForChat].sort((a, b) => a.createdAt - b.createdAt);
+
+      wrap.innerHTML = all.map((m) => {
         if (m.fromId === "gemini") {
           return `<div>
-            <div class="gemini-label">🤖 Gemini</div>
+            <div class="gemini-label">🤖 Gemini（あなただけに表示）</div>
             <div class="bubble gemini">${esc(m.text)}</div>
             <div class="bubble-time" style="text-align:left">${fmtTime(m.createdAt)}</div>
           </div>`;

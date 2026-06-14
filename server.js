@@ -6,7 +6,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import {
   upsertUser, getUser, updateProfile, getAllUsers,
   sendConnect, acceptConnect, getConnectionStatus, getConnections, getPending,
-  addMessage, getMessages, addGeminiMessage,
+  addMessage, getMessages,
 } from "./db.js";
 import { sharedFreeWindows, bestSlot, getBusyBlocks } from "./availability.js";
 
@@ -407,8 +407,7 @@ app.post("/api/ask-gemini/:targetId", requireSession, async (req, res) => {
     const recentMessages = getMessages(req.uid, targetId).slice(-10);
 
     if (!genAI) {
-      const msg = addGeminiMessage(req.uid, targetId, `（Gemini APIキーが未設定のため回答できません）`);
-      return res.json({ text: msg.text });
+      return res.json({ text: "（Gemini APIキーが未設定のため回答できません）" });
     }
 
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
@@ -433,8 +432,7 @@ ${question.trim()}
 
     const geminiRes = await model.generateContent(prompt);
     const text = geminiRes.response.text().trim();
-    const msg = addGeminiMessage(req.uid, targetId, text);
-    res.json({ text: msg.text });
+    res.json({ text });
   } catch (err) {
     console.error("Ask Gemini error:", err.message);
     res.status(500).json({ error: "Geminiへの質問に失敗しました" });
