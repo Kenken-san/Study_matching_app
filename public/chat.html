@@ -260,6 +260,51 @@
     .use-msg-btn:hover { opacity: 0.9; }
     .coach-loading { padding: 0.75rem 1rem; font-size: 0.82rem; color: #888; }
 
+    /* Availability card */
+    .avail-card {
+      flex-shrink: 0;
+      background: linear-gradient(135deg, #f0fff4, #f5fffb);
+      border-left: 3px solid #38a169;
+      border-bottom: 1px solid #e2e8f0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+    .avail-card.collapsed { max-height: 42px; }
+    .avail-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.6rem 1rem;
+      cursor: pointer;
+      user-select: none;
+    }
+    .avail-header-title { font-size: 0.82rem; font-weight: 700; color: #38a169; }
+    .avail-body { padding: 0 1rem 0.9rem; }
+    .best-slot {
+      background: white;
+      border: 1px solid #9ae6b4;
+      border-radius: 10px;
+      padding: 0.55rem 0.9rem;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .best-slot-label { font-size: 0.75rem; font-weight: 700; color: #276749; margin-bottom: 1px; }
+    .best-slot-time { font-size: 1rem; font-weight: 700; color: #38a169; }
+    .avail-windows { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 0.5rem; margin-top: 0.4rem; }
+    .avail-chip {
+      font-size: 0.73rem;
+      padding: 3px 10px;
+      background: #e6ffed;
+      border: 1px solid #9ae6b4;
+      border-radius: 20px;
+      color: #276749;
+      font-weight: 600;
+    }
+    .avail-no-data { font-size: 0.82rem; color: #777; line-height: 1.7; }
+    .avail-privacy { font-size: 0.68rem; color: #bbb; margin-top: 0.5rem; }
+
     @media (max-width: 560px) {
       .sidebar { width: 100%; display: none; }
       .sidebar.show { display: flex; position: fixed; inset: 0; z-index: 10; }
@@ -407,6 +452,15 @@
             <div class="coach-loading">Geminiがプランを生成中...</div>
           </div>
         </div>
+        <div class="avail-card" id="avail-card">
+          <div class="avail-header" onclick="toggleAvail()">
+            <span class="avail-header-title">📅 空き時間マッチ</span>
+            <button class="coach-toggle" id="avail-toggle-btn">▲ 閉じる</button>
+          </div>
+          <div class="avail-body" id="avail-body">
+            <div class="coach-loading">空き時間を計算中...</div>
+          </div>
+        </div>
         <div class="messages-wrap" id="messages-wrap">
           <div style="text-align:center;color:#aaa;font-size:0.8rem;padding:1rem">読み込み中...</div>
         </div>
@@ -425,11 +479,19 @@
         document.getElementById("coach-toggle-btn").textContent = "▼ 開く";
       }
 
+      // Restore avail collapsed state
+      const availCollapsed = localStorage.getItem(`avail-collapsed-${partnerId}`) === "1";
+      if (availCollapsed) {
+        document.getElementById("avail-card").classList.add("collapsed");
+        document.getElementById("avail-toggle-btn").textContent = "▼ 開く";
+      }
+
       if (pollTimer) clearInterval(pollTimer);
       fetchMessages();
       pollTimer = setInterval(fetchMessages, 3000);
 
       loadCoach(partnerId);
+      loadAvailability(partnerId);
     }
 
     function toggleCoach() {
@@ -474,6 +536,66 @@
       } catch {
         const body = document.getElementById("coach-body");
         if (body) body.innerHTML = `<div class="coach-loading" style="color:#e53e3e">読み込みに失敗しました</div>`;
+      }
+    }
+
+    function toggleAvail() {
+      const card = document.getElementById("avail-card");
+      const btn = document.getElementById("avail-toggle-btn");
+      if (!card) return;
+      const collapsed = card.classList.toggle("collapsed");
+      btn.textContent = collapsed ? "▼ 開く" : "▲ 閉じる";
+      if (currentPartnerId) {
+        localStorage.setItem(`avail-collapsed-${currentPartnerId}`, collapsed ? "1" : "0");
+      }
+    }
+
+    async function loadAvailability(partnerId) {
+      try {
+        const r = await fetch("/api/availability", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ targetId: partnerId }),
+        });
+        const data = await r.json();
+        const body = document.getElementById("avail-body");
+        if (!body) return;
+        if (!r.ok) {
+          body.innerHTML = `<div class="avail-no-data" style="color:#e53e3e">${esc(data.error || "取得に失敗しました")}</div>`;
+          return;
+        }
+        if (!data.hasData) {
+          body.innerHTML = `
+            <div class="avail-no-data">
+              どちらかのカレンダーがまだ連携されていません。<br>
+              カレンダーを連携すると、二人の空き時間が自動的に計算されます。
+            </div>
+            <div class="avail-privacy">${esc(data.privacyNote)}</div>`;
+          return;
+        }
+        let html = "";
+        if (data.bestSlot) {
+          html += `
+            <div class="best-slot">
+              <span style="font-size:1.1rem">⭐</span>
+              <div>
+                <div class="best-slot-label">おすすめの勉強時間</div>
+                <div class="best-slot-time">${esc(data.bestSlot.label)}</div>
+              </div>
+            </div>`;
+        }
+        if (data.windows?.length) {
+          html += `
+            <div class="plan-title">二人とも空いている時間</div>
+            <div class="avail-windows">
+              ${data.windows.map((w) => `<span class="avail-chip">${esc(w.dayLabel)} ${esc(w.start)}〜${esc(w.end)}</span>`).join("")}
+            </div>`;
+        }
+        html += `<div class="avail-privacy">${esc(data.privacyNote)}</div>`;
+        body.innerHTML = html;
+      } catch {
+        const body = document.getElementById("avail-body");
+        if (body) body.innerHTML = `<div class="avail-no-data" style="color:#e53e3e">読み込みに失敗しました</div>`;
       }
     }
 
